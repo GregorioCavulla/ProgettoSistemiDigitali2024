@@ -101,6 +101,26 @@ void save_streamline_to_file(const char* filename, double streamline_x[], double
     fclose(file);
 }
 
+// Salva l'ostacolo in un file per Gnuplot
+void save_obstacle_to_file(const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        printf("Errore nell'aprire il file %s\n", filename);
+        return;
+    }
+
+    // Scrive le coordinate dell'ostacolo
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < M; j++) {
+            if (obstacle[i][j] == 1) { // Se è un ostacolo
+                fprintf(file, "%d %d\n", i, j); // Salva la posizione dell'ostacolo
+            }
+        }
+    }
+
+    fclose(file);
+}
+
 int main() {
     // Inizializza la griglia
     initialize();
@@ -110,14 +130,6 @@ int main() {
     double streamline_x[MAX_STEPS], streamline_y[MAX_STEPS];
 
     // Calcola e salva le streamline da diversi punti di partenza
-
-    // double start_points[NUM_STREAMLINES][2] = {{10, 50}, {20, 50}, {30, 50}, {35, 45}, {35, 55}};
-
-    //qual è l'errore nell'istruzione sopra?
-    //start_points[NUM_STREAMLINES][2] = {{10, 50}, {20, 50}, {30, 50}, {35, 45}, {35, 55}};
-    //start_points[NUM_STREAMLINES][2] è un array di 2 elementi, quindi non può contenere 5 coppie di valori
-    //la corretta dichiarazione è 
-    
     double start_points[NUM_STREAMLINES][2] = {{10, 50}, {20, 50}, {30, 50}, {35, 45}, {35, 55}};
 
     for (int i = 0; i < NUM_STREAMLINES; i++) {
@@ -129,6 +141,9 @@ int main() {
 
         printf("Streamline %d salvata in %s\n", i, filename);
     }
+
+    // Salva l'ostacolo in un file
+    save_obstacle_to_file("obstacle.dat");
 
     printf("Streamline calcolate e salvate. Usa Gnuplot per visualizzarle.\n");
     return 0;
