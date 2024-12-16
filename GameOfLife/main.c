@@ -2,11 +2,12 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define WIDTH 1000       // Larghezza griglia
-#define HEIGHT 1000      // Altezza griglia
+#define WIDTH 150     // Larghezza griglia
+#define HEIGHT 150     // Altezza griglia
 #define SPECIES 3        // Numero di specie (1, 2, 3)
 #define STATES 3         // Stati della cella (1, 2, 3)
-#define ITERATIONS 10    // Iterazioni totali
+#define ITERATIONS 150   // Iterazioni totali
+#define DENSITY 0.5     // Percentuale di celle vive iniziali
 
 typedef struct {
     int species;  // Specie della cella (0 = vuota)
@@ -31,12 +32,49 @@ int countNeighbors(Cell grid[HEIGHT][WIDTH], int x, int y, int species) {
     return count;
 }
 
+// Funzione per inizializzare i glider in diverse posizioni
+// Funzione per inizializzare i glider in diverse posizioni in funzione della dimensione della griglia
+void initializeGliders(Cell grid[HEIGHT][WIDTH]) {
+    // Pattern Glider per specie 1
+    int x1 = WIDTH / 5;  // Posizione del glider 1
+    int y1 = HEIGHT / 5;
+    grid[y1][x1].species = 1; grid[y1][x1].state = 3;
+    grid[y1 + 1][x1].species = 1; grid[y1 + 1][x1].state = 3;
+    grid[y1 + 2][x1].species = 1; grid[y1 + 2][x1].state = 3;
+    grid[y1 + 1][x1 + 1].species = 1; grid[y1 + 1][x1 + 1].state = 3;
+    grid[y1][x1 + 2].species = 1; grid[y1][x1 + 2].state = 3;
+
+    // Pattern Glider per specie 2 (posizione angolo diverso)
+    int x2 = WIDTH / 2;  // Posizione del glider 2
+    int y2 = HEIGHT / 4;
+    grid[y2][x2].species = 2; grid[y2][x2].state = 3;
+    grid[y2 + 1][x2].species = 2; grid[y2 + 1][x2].state = 3;
+    grid[y2 + 2][x2].species = 2; grid[y2 + 2][x2].state = 3;
+    grid[y2 + 1][x2 + 1].species = 2; grid[y2 + 1][x2 + 1].state = 3;
+    grid[y2][x2 + 2].species = 2; grid[y2][x2 + 2].state = 3;
+
+    // Pattern Glider per specie 3 (posizione angolo diverso)
+    int x3 = WIDTH - WIDTH / 5;  // Posizione del glider 3
+    int y3 = HEIGHT - HEIGHT / 5;
+    grid[y3][x3].species = 3; grid[y3][x3].state = 3;
+    grid[y3 + 1][x3].species = 3; grid[y3 + 1][x3].state = 3;
+    grid[y3 + 2][x3].species = 3; grid[y3 + 2][x3].state = 3;
+    grid[y3 + 1][x3 + 1].species = 3; grid[y3 + 1][x3 + 1].state = 3;
+    grid[y3][x3 + 2].species = 3; grid[y3][x3 + 2].state = 3;
+}
+
+
 // Inizializza la griglia con specie casuali e stati iniziali
 void initializeGrid(Cell grid[HEIGHT][WIDTH]) {
     for (int y = 0; y < HEIGHT; y++) {
         for (int x = 0; x < WIDTH; x++) {
-            grid[y][x].species = rand() % (SPECIES + 1);  // Specie casuale (0 = vuota)
-            grid[y][x].state = (grid[y][x].species == 0) ? 0 : (rand() % STATES + 1); // Stato casuale
+            if (rand() / (double)RAND_MAX < DENSITY) {
+                grid[y][x].species = rand() % SPECIES + 1;  // Una specie casuale tra 1, 2, 3
+                grid[y][x].state = rand() % STATES + 1;     // Stato casuale tra 1 e 3
+            } else {
+                grid[y][x].species = 0;  // Cella vuota
+                grid[y][x].state = 0;
+            }
         }
     }
 }
@@ -139,7 +177,11 @@ int main() {
         return 1;
     }
 
+    // Inizializza la griglia con più celle vive
     initializeGrid(grid);
+
+    // Aggiungi i glider
+    initializeGliders(grid);
 
     for (int iter = 0; iter < ITERATIONS; iter++) {
         printf("Iterazione %d:\n", iter + 1);
