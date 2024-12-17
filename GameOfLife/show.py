@@ -9,6 +9,7 @@ COLORS = {
     1: (1.0, 0.0, 0.0),  # Rosso per specie 1
     2: (0.0, 1.0, 0.0),  # Verde per specie 2
     3: (0.0, 0.0, 1.0),  # Blu per specie 3
+    4: (1.0, 1.0, 0.0),  # Giallo per specie 4
 }
 
 # Funzione per leggere la griglia da file
@@ -76,7 +77,7 @@ def grid_to_colors(grid, cell_size):
 
 
 # Funzione per generare un'immagine da una griglia
-def grid_to_image(grid, iteration, resolution=2048): # Risoluzione di default
+def grid_to_image(grid, iteration, resolution=2048):  # Risoluzione di default
     """
     Genera un'immagine PIL da una griglia, con un numero di iterazione.
 
@@ -94,12 +95,8 @@ def grid_to_image(grid, iteration, resolution=2048): # Risoluzione di default
     # Crea l'immagine da array numpy
     img = Image.fromarray((color_grid * 255).astype(np.uint8))
 
-    # Aggiunge testo con il numero di iterazione
-    draw = ImageDraw.Draw(img)
-    font = ImageFont.load_default()
-    text = f"Generation: {iteration}"
-    draw.text((10, 10), text, font=font, fill=(0, 0, 0))  # Testo nero
     return img
+
 
 # Funzione per generare una GIF da una lista di immagini
 def generate_gif(image_list, output_path, duration=700):
@@ -120,6 +117,7 @@ def generate_gif(image_list, output_path, duration=700):
         loop=0
     )
     print(f"GIF salvata in: {output_path}")
+
 
 # Script principale
 def main():
@@ -156,6 +154,7 @@ def main():
 
     # Genera la GIF
     generate_gif(images, output_gif)
+
 
 if __name__ == "__main__":
     main()
