@@ -1,0 +1,4 @@
+Tempo FFT: 0.00314 secondi
+Tempo filtro: 0.00022 secondi
+Tempo IFFT: 0.00292 secondi
+Tempo totale: 0.01964 secondi

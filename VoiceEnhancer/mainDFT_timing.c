@@ -3,7 +3,6 @@
 #include <math.h>
 #include <string.h>
 #include <time.h> // Per misurare il tempo
-#include <fftw3.h> // Per FFTW
 #include <stdbool.h>
 
 #define TWO_PI 6.28318530718
@@ -40,55 +39,46 @@ void readWAVHeader(FILE *file, WAVHeader *header) {
     printf("Chunk ID: %.4s\n", header->chunkID);
 }
 
-// Funzione per applicare un filtro equalizzatore, che non azzera le frequenze fuori dal range specificato ma le riduce di ampiezza
-void applyPeriodicFilter(fftw_complex *fft, int N, double lowCut, double highCut, int sampleRate) {
+// Funzione per calcolare la DFT
+void computeDFT(double *input, double *real, double *imag, int N) {
     for (int k = 0; k < N; k++) {
-        double frequency = (double)k * sampleRate / N; // Calcolo della frequenza
-
-        if (frequency > 1800.0) {
-            // Elimina tutte le frequenze sopra i 2000 Hz
-            fft[k][0] = 0.0;
-            fft[k][1] = 0.0;
-        } else {
-            bool inBand = false;
-            for (int i = 0; i * lowCut <= 2000.0; i++) {
-                double lowerBound = lowCut + i*100;
-                double upperBound = highCut + i*100;
-
-                if (frequency >= lowerBound && frequency <= upperBound) {
-                    inBand = true;
-                    break;
-                }
-            }
-
-            if (!inBand) {
-                // Elimina frequenze fuori dalla banda
-                fft[k][0] = 0.0;
-                fft[k][1] = 0.0;
-            } else {
-                // amplifica le frequenze nella banda
-                fft[k][0] *= 1.5;
-                fft[k][1] *= 1.5;
-            }
+        real[k] = 0;
+        imag[k] = 0;
+        for (int n = 0; n < N; n++) {
+            double angle = TWO_PI * k * n / N;
+            real[k] += input[n] * cos(angle);
+            imag[k] -= input[n] * sin(angle);
         }
     }
 }
 
-void applyFilter(fftw_complex *fft, int N, double lowCut, double highCut, int sampleRate) {
+// Funzione per applicare un filtro
+void applyFilter(double *real, double *imag, int N, double lowCut, double highCut) {
     for (int k = 0; k < N; k++) {
-        double frequency = (double)k * sampleRate / N; // Calcolo della frequenza
+        double frequency = (double)k / N; // Normalizzazione
 
         if (frequency < lowCut || frequency > highCut) {
-            // Elimina le frequenze fuori dalla banda
-            fft[k][0] = 0.0;
-            fft[k][1] = 0.0;
+            real[k] = 0;
+            imag[k] = 0;
         }
+    }
+}
+
+// Funzione per calcolare la IDFT
+void computeIDFT(double *real, double *imag, double *output, int N) {
+    for (int n = 0; n < N; n++) {
+        output[n] = 0;
+        for (int k = 0; k < N; k++) {
+            double angle = TWO_PI * k * n / N;
+            output[n] += real[k] * cos(angle) - imag[k] * sin(angle);
+        }
+        output[n] /= N; // Normalizzazione
     }
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        printf("Uso: %s input.wav output.wav\n", argv[0]);
+    if (argc < 4) {
+        printf("Uso: %s input.wav output.wav report.txt\n", argv[0]);
         return 1;
     }
 
@@ -125,44 +115,38 @@ int main(int argc, char *argv[]) {
         input[i] = (double)audioData[i];
     }
 
-    // Alloco memoria per FFTW
-    fftw_complex *fft = fftw_malloc(sizeof(fftw_complex) * numSamples);
-    fftw_complex *ifft = fftw_malloc(sizeof(fftw_complex) * numSamples);
+    // Alloco memoria per DFT
+    double *real = (double *)malloc(numSamples * sizeof(double));
+    double *imag = (double *)malloc(numSamples * sizeof(double));
     double *output = (double *)malloc(numSamples * sizeof(double));
 
-    fftw_plan forwardPlan = fftw_plan_dft_r2c_1d(numSamples, input, fft, FFTW_ESTIMATE);
-    fftw_plan backwardPlan = fftw_plan_dft_c2r_1d(numSamples, fft, output, FFTW_ESTIMATE);
+    // Misura tempo DFT
+    printf("Calcolo DFT...\n");
+    clock_t startDFT = clock();
+    computeDFT(input, real, imag, numSamples);
+    clock_t endDFT = clock();
+    double timeDFT = (double)(endDFT - startDFT) / CLOCKS_PER_SEC;
+    printf("Tempo DFT: %.5f secondi\n", timeDFT);
 
-    // Misura tempo FFT
-    printf("Calcolo FFT...\n");
-    clock_t startFFT = clock();
-    fftw_execute(forwardPlan);
-    clock_t endFFT = clock();
-    printf("Tempo FFT: %.2f secondi\n", (double)(endFFT - startFFT) / CLOCKS_PER_SEC);
-
-    // Applico filtro: mantengo solo frequenze tra 85 Hz - 300 Hz
-    double lowCut = 250.0;
-    double highCut = 350.0;
+    // Applico filtro: es. enfatizzo voce umana (85 Hz - 300 Hz)
+    double lowCut = 250.0 / header.sampleRate;
+    double highCut = 350.0 / header.sampleRate;
 
     // Misura tempo filtro
     printf("Applicazione filtro...\n");
     clock_t startFilter = clock();
-    // applyPeriodicFilter(fft, numSamples, lowCut, highCut, header.sampleRate);
-    applyFilter(fft, numSamples, lowCut, highCut, header.sampleRate);
+    applyFilter(real, imag, numSamples, lowCut, highCut);
     clock_t endFilter = clock();
-    printf("Tempo filtro: %.2f secondi\n", (double)(endFilter - startFilter) / CLOCKS_PER_SEC);
+    double timeFilter = (double)(endFilter - startFilter) / CLOCKS_PER_SEC;
+    printf("Tempo filtro: %.5f secondi\n", timeFilter);
 
-    // Misura tempo IFFT
-    printf("Calcolo IFFT...\n");
-    clock_t startIFFT = clock();
-    fftw_execute(backwardPlan);
-    clock_t endIFFT = clock();
-    printf("Tempo IFFT: %.2f secondi\n", (double)(endIFFT - startIFFT) / CLOCKS_PER_SEC);
-
-    // Normalizzo l'output
-    for (int i = 0; i < numSamples; i++) {
-        output[i] /= numSamples;
-    }
+    // Misura tempo IDFT
+    printf("Calcolo IDFT...\n");
+    clock_t startIDFT = clock();
+    computeIDFT(real, imag, output, numSamples);
+    clock_t endIDFT = clock();
+    double timeIDFT = (double)(endIDFT - startIDFT) / CLOCKS_PER_SEC;
+    printf("Tempo IDFT: %.5f secondi\n", timeIDFT);
 
     // Scrivo il file WAV risultante
     printf("Scrittura file WAV...\n");
@@ -176,16 +160,27 @@ int main(int argc, char *argv[]) {
 
     // Fine misurazione del tempo totale
     clock_t endTotal = clock();
-    printf("Tempo totale: %.2f secondi\n", (double)(endTotal - startTotal) / CLOCKS_PER_SEC);
+    double timeTotal = (double)(endTotal - startTotal) / CLOCKS_PER_SEC;
+    printf("Tempo totale: %.5f secondi\n", timeTotal);
+
+    // Scrittura del report
+    FILE *reportFile = fopen(argv[3], "w");
+    if (reportFile) {
+        fprintf(reportFile, "Tempo DFT: %.5f secondi\n", timeDFT);
+        fprintf(reportFile, "Tempo filtro: %.5f secondi\n", timeFilter);
+        fprintf(reportFile, "Tempo IDFT: %.5f secondi\n", timeIDFT);
+        fprintf(reportFile, "Tempo totale: %.5f secondi\n", timeTotal);
+        fclose(reportFile);
+    } else {
+        perror("Errore nella creazione del file di report");
+    }
 
     // Libero memoria
     free(audioData);
     free(input);
-    fftw_free(fft);
-    fftw_free(ifft);
+    free(real);
+    free(imag);
     free(output);
-    fftw_destroy_plan(forwardPlan);
-    fftw_destroy_plan(backwardPlan);
 
     printf("File processato e salvato in: %s\n", argv[2]);
     return 0;

@@ -3,7 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include <time.h> // Per misurare il tempo
-#include <stdbool.h>
+#include <cuda.h>
 
 #define TWO_PI 6.28318530718
 
@@ -39,9 +39,10 @@ void readWAVHeader(FILE *file, WAVHeader *header) {
     printf("Chunk ID: %.4s\n", header->chunkID);
 }
 
-// Funzione per calcolare la DFT
-void computeDFT(double *input, double *real, double *imag, int N) {
-    for (int k = 0; k < N; k++) {
+// Kernel CUDA per calcolare la DFT
+__global__ void computeDFTKernel(double *input, double *real, double *imag, int N) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
+    if (k < N) {
         real[k] = 0;
         imag[k] = 0;
         for (int n = 0; n < N; n++) {
@@ -52,51 +53,10 @@ void computeDFT(double *input, double *real, double *imag, int N) {
     }
 }
 
-// Funzione per applicare un filtro equalizzatore
-void applyPeriodicFilter(double *real, double *imag, int N, double lowCut, double highCut) {
-    for (int k = 0; k < N; k++) {
-        double frequency = (double)k / N; // Normalizzazione
-
-        if(frequency > 1800.0){
-            real[k] = 0;
-            imag[k] = 0;
-        }else{
-            bool inBand = false;
-            for(int i=0; i*lowCut <= 2000.0; i++){
-                double lowerBound = lowCut + i*100;
-                double upperBound = highCut + i*100;
-
-                if(frequency >= lowerBound && frequency <= upperBound){
-                    inBand = true;
-                    break;
-                }
-            }
-
-            if(!inBand){
-                real[k] = 0;
-                imag[k] = 0;
-            }else{
-                real[k] *= 1.5;
-                imag[k] *= 1.5;
-            }
-        }
-    }
-}
-
-void applyFilter(double *real, double *imag, int N, double lowCut, double highCut) {
-    for (int k = 0; k < N; k++) {
-        double frequency = (double)k / N; // Normalizzazione
-
-        if (frequency < lowCut || frequency > highCut) {
-            real[k] = 0;
-            imag[k] = 0;
-        }
-    }
-}
-
-// Funzione per calcolare la IDFT
-void computeIDFT(double *real, double *imag, double *output, int N) {
-    for (int n = 0; n < N; n++) {
+// Kernel CUDA per calcolare la IDFT
+__global__ void computeIDFTKernel(double *real, double *imag, double *output, int N) {
+    int n = blockIdx.x * blockDim.x + threadIdx.x;
+    if (n < N) {
         output[n] = 0;
         for (int k = 0; k < N; k++) {
             double angle = TWO_PI * k * n / N;
@@ -106,9 +66,63 @@ void computeIDFT(double *real, double *imag, double *output, int N) {
     }
 }
 
+// Funzione host per calcolare la DFT usando CUDA
+void computeDFT(double *input, double *real, double *imag, int N) {
+    double *d_input, *d_real, *d_imag;
+
+    // Allocazione memoria sulla GPU
+    cudaMalloc(&d_input, N * sizeof(double));
+    cudaMalloc(&d_real, N * sizeof(double));
+    cudaMalloc(&d_imag, N * sizeof(double));
+
+    // Copia dei dati sulla GPU
+    cudaMemcpy(d_input, input, N * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Lancio del kernel
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
+    computeDFTKernel<<<blocksPerGrid, threadsPerBlock>>>(d_input, d_real, d_imag, N);
+
+    // Copia dei risultati dalla GPU alla CPU
+    cudaMemcpy(real, d_real, N * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(imag, d_imag, N * sizeof(double), cudaMemcpyDeviceToHost);
+
+    // Libera memoria sulla GPU
+    cudaFree(d_input);
+    cudaFree(d_real);
+    cudaFree(d_imag);
+}
+
+// Funzione host per calcolare la IDFT usando CUDA
+void computeIDFT(double *real, double *imag, double *output, int N) {
+    double *d_real, *d_imag, *d_output;
+
+    // Allocazione memoria sulla GPU
+    cudaMalloc(&d_real, N * sizeof(double));
+    cudaMalloc(&d_imag, N * sizeof(double));
+    cudaMalloc(&d_output, N * sizeof(double));
+
+    // Copia dei dati sulla GPU
+    cudaMemcpy(d_real, real, N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_imag, imag, N * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Lancio del kernel
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
+    computeIDFTKernel<<<blocksPerGrid, threadsPerBlock>>>(d_real, d_imag, d_output, N);
+
+    // Copia dei risultati dalla GPU alla CPU
+    cudaMemcpy(output, d_output, N * sizeof(double), cudaMemcpyDeviceToHost);
+
+    // Libera memoria sulla GPU
+    cudaFree(d_real);
+    cudaFree(d_imag);
+    cudaFree(d_output);
+}
+
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        printf("Uso: %s input.wav output.wav\n", argv[0]);
+    if (argc < 4) {
+        printf("Uso: %s input.wav output.wav report.txt\n", argv[0]);
         return 1;
     }
 
@@ -155,26 +169,28 @@ int main(int argc, char *argv[]) {
     clock_t startDFT = clock();
     computeDFT(input, real, imag, numSamples);
     clock_t endDFT = clock();
-    printf("Tempo DFT: %.2f secondi\n", (double)(endDFT - startDFT) / CLOCKS_PER_SEC);
+    double timeDFT = (double)(endDFT - startDFT) / CLOCKS_PER_SEC;
+    printf("Tempo DFT: %.5f secondi\n", timeDFT);
 
     // Applico filtro: es. enfatizzo voce umana (85 Hz - 300 Hz)
     double lowCut = 85.0 / header.sampleRate;
     double highCut = 300.0 / header.sampleRate;
 
-    // Misura tempo filtro
-    printf("Applicazione filtro...\n");
-    clock_t startFilter = clock();
-    //applyPeriodicFilter(real, imag, numSamples, lowCut, highCut);
-    applyFilter(real, imag, numSamples, lowCut, highCut);
-    clock_t endFilter = clock();
-    printf("Tempo filtro: %.2f secondi\n", (double)(endFilter - startFilter) / CLOCKS_PER_SEC);
+    for (int k = 0; k < numSamples; k++) {
+        double frequency = (double)k / numSamples; // Normalizzazione
+        if (frequency < lowCut || frequency > highCut) {
+            real[k] = 0;
+            imag[k] = 0;
+        }
+    }
 
     // Misura tempo IDFT
     printf("Calcolo IDFT...\n");
     clock_t startIDFT = clock();
     computeIDFT(real, imag, output, numSamples);
     clock_t endIDFT = clock();
-    printf("Tempo IDFT: %.2f secondi\n", (double)(endIDFT - startIDFT) / CLOCKS_PER_SEC);
+    double timeIDFT = (double)(endIDFT - startIDFT) / CLOCKS_PER_SEC;
+    printf("Tempo IDFT: %.5f secondi\n", timeIDFT);
 
     // Scrivo il file WAV risultante
     printf("Scrittura file WAV...\n");
@@ -188,7 +204,19 @@ int main(int argc, char *argv[]) {
 
     // Fine misurazione del tempo totale
     clock_t endTotal = clock();
-    printf("Tempo totale: %.2f secondi\n", (double)(endTotal - startTotal) / CLOCKS_PER_SEC);
+    double timeTotal = (double)(endTotal - startTotal) / CLOCKS_PER_SEC;
+    printf("Tempo totale: %.5f secondi\n", timeTotal);
+
+    // Scrittura del report
+    FILE *reportFile = fopen(argv[3], "w");
+    if (reportFile) {
+        fprintf(reportFile, "Tempo DFT: %.5f secondi\n", timeDFT);
+        fprintf(reportFile, "Tempo IDFT: %.5f secondi\n", timeIDFT);
+        fprintf(reportFile, "Tempo totale: %.5f secondi\n", timeTotal);
+        fclose(reportFile);
+    } else {
+        perror("Errore nella creazione del file di report");
+    }
 
     // Libero memoria
     free(audioData);

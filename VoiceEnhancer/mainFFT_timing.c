@@ -40,40 +40,7 @@ void readWAVHeader(FILE *file, WAVHeader *header) {
     printf("Chunk ID: %.4s\n", header->chunkID);
 }
 
-// Funzione per applicare un filtro equalizzatore, che non azzera le frequenze fuori dal range specificato ma le riduce di ampiezza
-void applyPeriodicFilter(fftw_complex *fft, int N, double lowCut, double highCut, int sampleRate) {
-    for (int k = 0; k < N; k++) {
-        double frequency = (double)k * sampleRate / N; // Calcolo della frequenza
-
-        if (frequency > 1800.0) {
-            // Elimina tutte le frequenze sopra i 2000 Hz
-            fft[k][0] = 0.0;
-            fft[k][1] = 0.0;
-        } else {
-            bool inBand = false;
-            for (int i = 0; i * lowCut <= 2000.0; i++) {
-                double lowerBound = lowCut + i*100;
-                double upperBound = highCut + i*100;
-
-                if (frequency >= lowerBound && frequency <= upperBound) {
-                    inBand = true;
-                    break;
-                }
-            }
-
-            if (!inBand) {
-                // Elimina frequenze fuori dalla banda
-                fft[k][0] = 0.0;
-                fft[k][1] = 0.0;
-            } else {
-                // amplifica le frequenze nella banda
-                fft[k][0] *= 1.5;
-                fft[k][1] *= 1.5;
-            }
-        }
-    }
-}
-
+// Funzione per applicare un filtro
 void applyFilter(fftw_complex *fft, int N, double lowCut, double highCut, int sampleRate) {
     for (int k = 0; k < N; k++) {
         double frequency = (double)k * sampleRate / N; // Calcolo della frequenza
@@ -87,8 +54,8 @@ void applyFilter(fftw_complex *fft, int N, double lowCut, double highCut, int sa
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        printf("Uso: %s input.wav output.wav\n", argv[0]);
+    if (argc < 4) {
+        printf("Uso: %s input.wav output.wav report.txt\n", argv[0]);
         return 1;
     }
 
@@ -138,7 +105,8 @@ int main(int argc, char *argv[]) {
     clock_t startFFT = clock();
     fftw_execute(forwardPlan);
     clock_t endFFT = clock();
-    printf("Tempo FFT: %.2f secondi\n", (double)(endFFT - startFFT) / CLOCKS_PER_SEC);
+    double fftTime = (double)(endFFT - startFFT) / CLOCKS_PER_SEC;
+    printf("Tempo FFT: %.5f secondi\n", fftTime);
 
     // Applico filtro: mantengo solo frequenze tra 85 Hz - 300 Hz
     double lowCut = 250.0;
@@ -147,17 +115,18 @@ int main(int argc, char *argv[]) {
     // Misura tempo filtro
     printf("Applicazione filtro...\n");
     clock_t startFilter = clock();
-    // applyPeriodicFilter(fft, numSamples, lowCut, highCut, header.sampleRate);
     applyFilter(fft, numSamples, lowCut, highCut, header.sampleRate);
     clock_t endFilter = clock();
-    printf("Tempo filtro: %.2f secondi\n", (double)(endFilter - startFilter) / CLOCKS_PER_SEC);
+    double filterTime = (double)(endFilter - startFilter) / CLOCKS_PER_SEC;
+    printf("Tempo filtro: %.5f secondi\n", filterTime);
 
     // Misura tempo IFFT
     printf("Calcolo IFFT...\n");
     clock_t startIFFT = clock();
     fftw_execute(backwardPlan);
     clock_t endIFFT = clock();
-    printf("Tempo IFFT: %.2f secondi\n", (double)(endIFFT - startIFFT) / CLOCKS_PER_SEC);
+    double ifftTime = (double)(endIFFT - startIFFT) / CLOCKS_PER_SEC;
+    printf("Tempo IFFT: %.5f secondi\n", ifftTime);
 
     // Normalizzo l'output
     for (int i = 0; i < numSamples; i++) {
@@ -174,9 +143,17 @@ int main(int argc, char *argv[]) {
     }
     fclose(outputFile);
 
-    // Fine misurazione del tempo totale
-    clock_t endTotal = clock();
-    printf("Tempo totale: %.2f secondi\n", (double)(endTotal - startTotal) / CLOCKS_PER_SEC);
+    // Scrivo il report delle prestazioni
+    FILE *reportFile = fopen(argv[3], "w");
+    if (reportFile) {
+        fprintf(reportFile, "Tempo FFT: %.5f secondi\n", fftTime);
+        fprintf(reportFile, "Tempo filtro: %.5f secondi\n", filterTime);
+        fprintf(reportFile, "Tempo IFFT: %.5f secondi\n", ifftTime);
+        fprintf(reportFile, "Tempo totale: %.5f secondi\n", (double)(clock() - startTotal) / CLOCKS_PER_SEC);
+        fclose(reportFile);
+    } else {
+        printf("Errore nella scrittura del file di report.\n");
+    }
 
     // Libero memoria
     free(audioData);
@@ -188,5 +165,6 @@ int main(int argc, char *argv[]) {
     fftw_destroy_plan(backwardPlan);
 
     printf("File processato e salvato in: %s\n", argv[2]);
+    printf("Report salvato in: %s\n", argv[3]);
     return 0;
 }

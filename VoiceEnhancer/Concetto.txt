@@ -1,0 +1,11 @@
+Fase 1:
+
+- Test del filtro utilizzando mainFFT.c che pulisce il file audio applicando FFT, filtro, IFFT
+
+- Trovato il filtro giusto lo si traspone sul programma mainDFT.c che pulisce il file applicando DFT, filtro, IDFT
+
+- modifica dei due file aggiungendo un file di output per tenere traccia dei tempi
+
+Fase 2:
+
+- parallelizzazione in CUDA di mainDFT.c
