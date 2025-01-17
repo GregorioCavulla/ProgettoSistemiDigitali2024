@@ -1,0 +1,100 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{margin=1in}
+
+\definecolor{codebg}{rgb}{0.95,0.95,0.95}
+\definecolor{keyword}{rgb}{0.5,0,0.5}
+\definecolor{comment}{rgb}{0,0.5,0}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{keyword}\bfseries,
+  commentstyle=\color{comment}\itshape,
+  stringstyle=\color{blue},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  frame=single,
+  breaklines=true,
+  tabsize=4,
+  showspaces=false,
+  showtabs=false,
+  showstringspaces=false
+}
+
+\title{Elaborazione Sequenziale di Segnali Audio con DFT e IDFT}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduzione}
+Questo progetto si propone di elaborare segnali audio utilizzando un approccio sequenziale. L'obiettivo è implementare trasformazioni nel dominio delle frequenze per applicare un filtro passa-basso e produrre un segnale audio modificato. Il processo comprende le seguenti fasi:
+\begin{itemize}
+    \item Lettura di un file audio in formato \texttt{.wav};
+    \item Calcolo della Trasformata Discreta di Fourier (DFT);
+    \item Applicazione di un filtro passa-basso nel dominio delle frequenze;
+    \item Calcolo della Trasformata Inversa (IDFT);
+    \item Scrittura del segnale audio modificato su file;
+    \item Generazione di un report sui tempi di esecuzione.
+\end{itemize}
+
+\section{Implementazione Sequenziale}
+Il codice è stato scritto in linguaggio \texttt{C} e utilizza le librerie standard per la manipolazione di file e la misurazione del tempo. La struttura principale del programma comprende:
+
+\subsection{Lettura e Scrittura di File Audio}
+I file audio sono letti e scritti in formato \texttt{.wav} standard, utilizzando un'intestazione di 44 byte per rappresentare i metadati del file. I campioni audio sono gestiti come array di tipo \texttt{double}, normalizzati rispetto ai valori originali in \texttt{int16\_t}. La seguente funzione legge i campioni audio:
+
+\lstinputlisting[language=C, firstline=6, lastline=22, caption={Funzione per leggere file audio .wav.}]{code.c}
+
+Ecco invece la funzione per scrivere un file audio:
+
+\lstinputlisting[language=C, firstline=24, lastline=57, caption={Funzione per scrivere file audio .wav.}]{code.c}
+
+\subsection{Trasformata Discreta di Fourier (DFT)}
+La DFT converte un segnale audio dal dominio del tempo a quello delle frequenze. La funzione \texttt{dft()} implementa la seguente formula:
+\begin{equation}
+    X[k] = \sum_{n=0}^{N-1} x[n] \cdot \cos\left(\frac{2\pi k n}{N}\right)
+\end{equation}
+
+\lstinputlisting[language=C, firstline=59, lastline=66, caption={Implementazione della DFT.}]{code.c}
+
+\subsection{Filtro Passa-Basso}
+Un filtro passa-basso è applicato nel dominio delle frequenze per rimuovere le componenti indesiderate. La funzione azzera le frequenze al di fuori di una soglia specificata:
+
+\lstinputlisting[language=C, firstline=68, lastline=74, caption={Applicazione del filtro passa-basso.}]{code.c}
+
+\subsection{Trasformata Inversa (IDFT)}
+La IDFT riporta il segnale audio dal dominio delle frequenze al dominio del tempo. La funzione \texttt{idft()} è basata sulla formula:
+\begin{equation}
+    x[n] = \frac{1}{N} \sum_{k=0}^{N-1} X[k] \cdot \cos\left(\frac{2\pi k n}{N}\right)
+\end{equation}
+
+\lstinputlisting[language=C, firstline=76, lastline=86, caption={Implementazione della IDFT.}]{code.c}
+
+\subsection{Misurazione delle Prestazioni}
+I tempi di esecuzione delle diverse fasi del programma vengono misurati e riportati in un file di testo:
+
+\lstinputlisting[language=C, firstline=88, lastline=99, caption={Funzione per scrivere il report dei tempi.}]{code.c}
+
+\section{Esecuzione del Programma}
+La funzione \texttt{main()} coordina l'intero processo, dalla lettura del file audio alla scrittura dei risultati. Viene utilizzata la libreria \texttt{time.h} per misurare i tempi di esecuzione:
+
+\lstinputlisting[language=C, firstline=101, lastline=137, caption={Funzione main del programma.}]{code.c}
+
+\section{Risultati}
+Il programma è stato testato su un file audio mono con 44.1 kHz di frequenza di campionamento e una durata di un secondo. I tempi di esecuzione sono riportati nel file \texttt{reportDFT.txt} generato automaticamente. I risultati mostrano tempi di calcolo consistenti con le complessità delle operazioni.
+
+\end{document}
