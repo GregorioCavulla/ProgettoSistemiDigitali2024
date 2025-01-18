@@ -184,8 +184,8 @@ int main(int argc, char *argv[]) {
 
     // Percorsi per i file di output
     char outputFile[256], reportFile[256];
-    snprintf(outputFile, sizeof(outputFile), "./output/output_%s.wav", timestamp);
-    snprintf(reportFile, sizeof(reportFile), "./reports/report_%s.txt", timestamp);
+    snprintf(outputFile, sizeof(outputFile), "./output/cuda_output_%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_report_%s.txt", timestamp);
 
     // Leggi il file audio
     readWavFile(filename, x, N);
