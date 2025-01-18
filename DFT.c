@@ -131,8 +131,8 @@ void writeReport(const char *filename, double dftTime, double filterTime, double
     fclose(file);
 }
 
-// Funzione main
-int main() {
+// Funzione main, prende in input il nome del file audio e restituisce il file audio filtrato
+int main(int argc, char *argv[] ) {
     int N = 44100;
     double *x = (double *)malloc(N * sizeof(double)); // Allocazione dinamica di memoria per il segnale audio
     double *X = (double *)malloc(N * sizeof(double)); // Allocazione dinamica di memoria per la DFT del segnale audio
@@ -140,9 +140,18 @@ int main() {
 
     clock_t start, end;
     double dftTime, filterTime, idftTime;
+    char *filename;
+
+    // Verifica che il numero di argomenti sia corretto
+    if (argc != 2) {
+        printf("Utilizzo: %s <file_audio.wav>\n", argv[0]);
+        exit(1);
+    }
+
+    filename = argv[1];
 
     // Leggi il file audio
-    readWavFile("./test_wav/short_mono.wav", x, N);
+    readWavFile(filename, x, N);
 
     // Calcola la DFT
     start = clock();
