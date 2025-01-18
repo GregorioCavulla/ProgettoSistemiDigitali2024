@@ -29,10 +29,13 @@ def generate_wav_file(filename, duration, sample_rate=44100):
 os.makedirs("test_wav", exist_ok=True)
 
 # File brevi (durata minima)
-generate_wav_file("test_wav/short_noise.wav", duration=0.5)  # Breve
+# generate_wav_file("test_wav/short_noise.wav", duration=0.5)  # Breve
 
 # File lunghi (durata apprezzabile)
-generate_wav_file("test_wav/long_noise.wav", duration=5.0)  # Lungo
+# generate_wav_file("test_wav/long_noise.wav", duration=5.0)  # Lungo
+
+# File molto lunghi (durata apprezzabile)
+generate_wav_file("test_wav/veryLong_noise.wav", duration=15.0)  # Molto lungo
 
 print("File .wav generati nella cartella 'test_wav':")
 print("- short_noise.wav\n- long_noise.wav")
