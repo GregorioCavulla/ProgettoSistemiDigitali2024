@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
     // Misura tempo DFT
     printf("Calcolo DFT...\n");
     clock_t startDFT = clock();
-    computeDFT(input, real, imag, numSamples);
+    computeDFT(input, real, imag, numSamples);   //FUNZIONE DA KERNELLIZZARE
     clock_t endDFT = clock();
     double timeDFT = (double)(endDFT - startDFT) / CLOCKS_PER_SEC;
     printf("Tempo DFT: %.5f secondi\n", timeDFT);
@@ -143,8 +143,8 @@ int main(int argc, char *argv[]) {
     // Misura tempo IDFT
     printf("Calcolo IDFT...\n");
     clock_t startIDFT = clock();
-    computeIDFT(real, imag, output, numSamples);
-    clock_t endIDFT = clock();
+    computeIDFT(real, imag, output, numSamples);   //FUNZIONE DA KERNELLIZZARE
+    clock_t endIDFT = clock(); 
     double timeIDFT = (double)(endIDFT - startIDFT) / CLOCKS_PER_SEC;
     printf("Tempo IDFT: %.5f secondi\n", timeIDFT);
 
@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
     } else {
         perror("Errore nella creazione del file di report");
     }
-
+    
     // Libero memoria
     free(audioData);
     free(input);
