@@ -3,11 +3,19 @@
 #include <math.h>
 #include <time.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 #define PI 3.14159265358979323846
 
-// Funzione per leggere l'intestazione di un file .wav
-void readWavFile(const char *filename, double *x, int N) {
+// Funzione per creare una stringa di timestamp
+void createTimestamp(char *buffer, size_t size) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buffer, size, "%Y%m%d_%H%M%S", t);
+}
+
+// Funzione per leggere l'intestazione di un file .wav e determinare la lunghezza
+int getWavFileLength(const char *filename) {
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
         printf("Errore nell'apertura del file %s\n", filename);
@@ -17,6 +25,24 @@ void readWavFile(const char *filename, double *x, int N) {
     // Leggi l'intestazione del file .wav (44 byte standard)
     uint8_t header[44];
     fread(header, sizeof(uint8_t), 44, file);
+
+    // Calcola la dimensione del file audio in campioni
+    int dataSize = header[40] | (header[41] << 8) | (header[42] << 16) | (header[43] << 24);
+    fclose(file);
+
+    return dataSize / sizeof(int16_t);
+}
+
+// Funzione per leggere i campioni audio da un file .wav
+void readWavFile(const char *filename, double *x, int N) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        printf("Errore nell'apertura del file %s\n", filename);
+        exit(1);
+    }
+
+    // Salta l'intestazione del file .wav (44 byte standard)
+    fseek(file, 44, SEEK_SET);
 
     // Leggi i campioni audio come int16_t e convertili in double
     int16_t *buffer = (int16_t *)malloc(N * sizeof(int16_t));
@@ -84,7 +110,7 @@ void writeWavFile(const char *filename, double *x, int N) {
 }
 
 // Funzione che calcola la Discrete Fourier Transform di un segnale audio
-void dft(double *x, double *X, int N) {
+void dft(double *x, double *X, int N) { // N = numero di campioni, complessità O(N^2)
     for (int k = 0; k < N; k++) {
         X[k] = 0;
         for (int n = 0; n < N; n++) {
@@ -103,7 +129,7 @@ void filtro(double *X, int N, int fc) {
 }
 
 // Funzione che calcola l'Inverse Discrete Fourier Transform del segnale audio filtrato
-void idft(double *X, double *x, int N) {
+void idft(double *X, double *x, int N) { // N = numero di campioni, complessità O(N^2)
     for (int n = 0; n < N; n++) {
         x[n] = 0;
         for (int k = 0; k < N; k++) {
@@ -133,11 +159,8 @@ void writeReport(const char *filename, double dftTime, double filterTime, double
 
 // Funzione main, prende in input il nome del file audio e restituisce il file audio filtrato
 int main(int argc, char *argv[] ) {
-    int N = 44100;
-    double *x = (double *)malloc(N * sizeof(double)); // Allocazione dinamica di memoria per il segnale audio
-    double *X = (double *)malloc(N * sizeof(double)); // Allocazione dinamica di memoria per la DFT del segnale audio
-    double *y = (double *)malloc(N * sizeof(double)); // Allocazione dinamica di memoria per il segnale audio filtrato
-
+    double *x, *X, *y;
+    int N;
     clock_t start, end;
     double dftTime, filterTime, idftTime;
     char *filename;
@@ -149,6 +172,27 @@ int main(int argc, char *argv[] ) {
     }
 
     filename = argv[1];
+
+    // Creazione delle directory ./output e ./reports se non esistono
+    mkdir("./output", 0777);
+    mkdir("./reports", 0777);
+
+    // Determina la lunghezza del file audio
+    N = getWavFileLength(filename);
+
+    // Allocazione dinamica della memoria
+    x = (double *)malloc(N * sizeof(double));
+    X = (double *)malloc(N * sizeof(double));
+    y = (double *)malloc(N * sizeof(double));
+
+    // Creazione di un timestamp
+    char timestamp[20];
+    createTimestamp(timestamp, sizeof(timestamp));
+
+    // Percorsi per i file di output
+    char outputFile[256], reportFile[256];
+    snprintf(outputFile, sizeof(outputFile), "./output/output_%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/report_%s.txt", timestamp);
 
     // Leggi il file audio
     readWavFile(filename, x, N);
@@ -171,11 +215,11 @@ int main(int argc, char *argv[] ) {
     end = clock();
     idftTime = (double)(end - start) / CLOCKS_PER_SEC;
 
-    // Scrivi il file audio filtrato
-    writeWavFile("output.wav", y, N);
+    // Scrivi il file output
+    writeWavFile(outputFile, y, N);
 
     // Scrivi il report dei tempi
-    writeReport("reportDFT.txt", dftTime, filterTime, idftTime, dftTime + filterTime + idftTime);
+    writeReport(reportFile, dftTime, filterTime, idftTime, dftTime + filterTime + idftTime);
 
     // Libera la memoria
     free(x);
