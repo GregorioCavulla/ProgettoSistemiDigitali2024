@@ -1,4 +1,0 @@
-Tempo DFT: 61.51738 secondi
-Tempo filtro: 0.00012 secondi
-Tempo IDFT: 59.86665 secondi
-Tempo totale: 121.38585 secondi

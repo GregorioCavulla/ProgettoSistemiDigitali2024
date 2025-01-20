@@ -1,3 +1,0 @@
-Tempo DFT: 1.59956 secondi
-Tempo IDFT: 1.51013 secondi
-Tempo totale: 3.11161 secondi
