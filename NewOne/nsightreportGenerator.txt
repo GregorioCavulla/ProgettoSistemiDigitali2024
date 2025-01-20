@@ -1,0 +1,1 @@
+/usr/local/cuda/bin/ncu --export ./reports/Nsight/profile_report ./[eseguibile] ./input/long_noise.wav
