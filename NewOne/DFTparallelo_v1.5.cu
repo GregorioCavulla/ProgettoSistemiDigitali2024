@@ -1,4 +1,4 @@
-
+//filtro host con i float
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +33,7 @@ int getWavFileLength(const char *filename) {
 }
 
 // Funzione per leggere i campioni audio da un file .wav
-void readWavFile(const char *filename, double *x, int N) {
+void readWavFile(const char *filename, float *x, int N) {
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
         printf("Errore nell'apertura del file %s\n", filename);
@@ -44,7 +44,7 @@ void readWavFile(const char *filename, double *x, int N) {
     int16_t *buffer = (int16_t *)malloc(N * sizeof(int16_t));
     fread(buffer, sizeof(int16_t), N, file);
     for (int i = 0; i < N; i++) {
-        x[i] = (double)buffer[i];
+        x[i] = (float)buffer[i];
     }
 
     free(buffer);
@@ -52,7 +52,7 @@ void readWavFile(const char *filename, double *x, int N) {
 }
 
 // Funzione per scrivere un file .wav con l'intestazione
-void writeWavFile(const char *filename, double *x, int N) {
+void writeWavFile(const char *filename, float *x, int N) {
     FILE *file = fopen(filename, "wb");
     if (file == NULL) {
         printf("Errore nell'apertura del file %s\n", filename);
@@ -99,36 +99,35 @@ void writeWavFile(const char *filename, double *x, int N) {
 }
 
 // Kernel per calcolare la DFT (solo parte reale)
-__global__ void dftKernel(const double *x, double *X_real, int N) {
+__global__ void dftKernel(const float *x, float *X_real, int N) {
     int k = threadIdx.x + blockIdx.x * blockDim.x;
     if (k < N) {
-        double sum_real = 0.0;
+        float sum_real = 0.0f;
         for (int n = 0; n < N; n++) {
-            double angle = 2.0 * PI * k * n / N;
-            sum_real += x[n] * cos(angle);
+            float angle = 2.0f * PI * k * n / N;
+            sum_real += x[n] * cosf(angle);
         }
         X_real[k] = sum_real;
     }
 }
 
-
-// Funzione che applica un filtro passa-basso al segnale audio
-void filtro(double *X, int N, int fc) {
+// Funzione host per applicare un filtro passa-basso al segnale audio
+void filtroHost(float *X_real, int N, int fc) {
     for (int k = 0; k < N; k++) {
         if (k > fc && k < N - fc) {
-            X[k] = 0;
+            X_real[k] = 0.0f;
         }
     }
 }
 
 // Kernel per calcolare la IDFT (solo parte reale)
-__global__ void idftKernel(const double *X_real, double *x, int N) {
+__global__ void idftKernel(const float *X_real, float *x, int N) {
     int n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n < N) {
-        double sum = 0.0;
+        float sum = 0.0f;
         for (int k = 0; k < N; k++) {
-            double angle = 2.0 * PI * k * n / N;
-            sum += X_real[k] * cos(angle);
+            float angle = 2.0f * PI * k * n / N;
+            sum += X_real[k] * cosf(angle);
         }
         x[n] = sum / N;
     }
@@ -154,7 +153,7 @@ void writeReport(const char *filename, double dftTime, double filterTime, double
 
 // Funzione principale
 int main(int argc, char *argv[]) {
-    double *x, *X_real, *y;
+    float *x, *X_real, *y;
     int N;
     clock_t start, end;
     double dftTime, filterTime, idftTime;
@@ -176,9 +175,9 @@ int main(int argc, char *argv[]) {
     N = getWavFileLength(filename);
 
     // Allocazione dinamica della memoria
-    x = (double *)malloc(N * sizeof(double));
-    X_real = (double *)malloc(N * sizeof(double));
-    y = (double *)malloc(N * sizeof(double));
+    x = (float *)malloc(N * sizeof(float));
+    X_real = (float *)malloc(N * sizeof(float));
+    y = (float *)malloc(N * sizeof(float));
 
     // Creazione di un timestamp
     char timestamp[20];
@@ -186,20 +185,20 @@ int main(int argc, char *argv[]) {
 
     // Percorsi per i file di output
     char outputFile[256], reportFile[256];
-    snprintf(outputFile, sizeof(outputFile), "./output/cuda_output_%s.wav", timestamp);
-    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_report_%s.txt", timestamp);
+    snprintf(outputFile, sizeof(outputFile), "./output/cuda_v1.5_output_%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_v1.5_report_%s.txt", timestamp);
 
     // Leggi il file audio
     readWavFile(filename, x, N);
 
     // Allocazione memoria device
-    double *d_x, *d_X_real, *d_y;
-    cudaMalloc((void **)&d_x, N * sizeof(double));
-    cudaMalloc((void **)&d_X_real, N * sizeof(double));
-    cudaMalloc((void **)&d_y, N * sizeof(double));
+    float *d_x, *d_X_real, *d_y;
+    cudaMalloc((void **)&d_x, N * sizeof(float));
+    cudaMalloc((void **)&d_X_real, N * sizeof(float));
+    cudaMalloc((void **)&d_y, N * sizeof(float));
 
     // Copia dati host -> device
-    cudaMemcpy(d_x, x, N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
 
     // Configurazione kernel
     int blockSize = 256;
@@ -212,9 +211,11 @@ int main(int argc, char *argv[]) {
     end = clock();
     dftTime = (double)(end - start) / CLOCKS_PER_SEC;
 
-    // Applicazione filtro passa-basso
+    // Applicazione filtro passa-basso (host)
     start = clock();
-    filtro(d_X_real, N, 1000);
+    cudaMemcpy(X_real, d_X_real, N * sizeof(float), cudaMemcpyDeviceToHost);
+    filtroHost(X_real, N, 1000);
+    cudaMemcpy(d_X_real, X_real, N * sizeof(float), cudaMemcpyHostToDevice);
     end = clock();
     filterTime = (double)(end - start) / CLOCKS_PER_SEC;
 
@@ -226,7 +227,7 @@ int main(int argc, char *argv[]) {
     idftTime = (double)(end - start) / CLOCKS_PER_SEC;
 
     // Copia risultati device -> host
-    cudaMemcpy(y, d_y, N * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(y, d_y, N * sizeof(float), cudaMemcpyDeviceToHost);
 
     // Scrivi il file audio modificato
     writeWavFile(outputFile, y, N);
@@ -244,4 +245,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
