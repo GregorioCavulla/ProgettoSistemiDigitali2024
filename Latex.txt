@@ -1,118 +1,413 @@
-\documentclass[a4paper,12pt]{article}
+\documentclass[a4paper, 11pt]{article}
+\usepackage[margin=3cm]{geometry}
+\usepackage[]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{geometry}
-\usepackage{listings}
+\usepackage{gensymb}
+\usepackage{graphicx}
+\usepackage{psfrag,amsmath,amsfonts,verbatim}
 \usepackage{xcolor}
+\usepackage{color,soul}
+\usepackage{fancyhdr}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{newlfont}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{latexsym}
+\usepackage{amsthm}
+\usepackage{subfigure}
+\usepackage{subcaption}
+\usepackage{psfrag}
+\usepackage{footnote}
+\usepackage{graphics}
+\usepackage{color}
 \usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{float}
 
-\geometry{margin=1in}
+\usetikzlibrary{snakes}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes,arrows}
 
-\definecolor{codebg}{rgb}{0.95,0.95,0.95}
-\definecolor{keyword}{rgb}{0.5,0,0.5}
-\definecolor{comment}{rgb}{0,0.5,0}
+	
+	\tikzstyle{block} = [draw, fill=white, rectangle, 
+	minimum height=3em, minimum width=6em]
+	\tikzstyle{sum} = [draw, fill=white, circle, node distance=1cm]
+	\tikzstyle{input} = [coordinate]
+	\tikzstyle{output} = [coordinate]
+	\tikzstyle{pinstyle} = [pin edge={to-,thin,black}]
 
-\lstset{
-  backgroundcolor=\color{codebg},
-  basicstyle=\ttfamily\footnotesize,
-  keywordstyle=\color{keyword}\bfseries,
-  commentstyle=\color{comment}\itshape,
-  stringstyle=\color{blue},
-  numbers=left,
-  numberstyle=\tiny,
-  stepnumber=1,
-  frame=single,
-  breaklines=true,
-  tabsize=4,
-  showspaces=false,
-  showtabs=false,
-  showstringspaces=false
+\newcommand{\courseacronym}{CAT}
+\newcommand{\coursename}{Controlli Automatici - T}
+\newcommand{\tipology}{B}
+\newcommand{\trace}{1}
+\newcommand{\projectname}{Controllo trattamento farmacologico contro il cancro}
+\newcommand{\group}{AI}
+
+%opening
+\title{ \vspace{-1in}
+		\huge \strut \coursename \strut 
+		\\
+		\Large  \strut Progetto Tipologia \tipology - Traccia \trace 
+		\\
+		\Large  \strut \projectname\strut
+		\\
+		\Large  \strut Gruppo \group\strut
+		\vspace{-0.4cm}
 }
-
-\title{Elaborazione Sequenziale di Segnali Audio con DFT e IDFT}
-\author{}
+\author{ Alessio Benenati, Gregorio Cavulla, Luca Capelli, Pietro Garotti}
 \date{}
 
 \begin{document}
 
 \maketitle
+\vspace{-0.5cm}
 
-\tableofcontents
+Il progetto si concentra sull'applicazione di tecniche di controllo automatico per il trattamento farmacologico di cellule cancerose in un ambiente di laboratorio. La dinamica di queste cellule è descritta dalle seguenti equazioni differenziali.
+%
+\begin{subequations}\label{eq:system}
+\begin{align}
+	    \dot{n}_s &= -r_s \ln(\frac{n_s+n_r}{K})n_s - m_s c_f n_s - \beta n_s + \gamma n_r - \alpha c_f n_s
+ \\
+    \dot{n}_r &= -r_r \ln(\frac{n_s+n_r}{K})n_r - m_r c_f n_r + \beta n_s - \gamma n_r + \alpha c_f n_s,
+\end{align}
+\end{subequations}
+%
 
-\section{Introduzione}
-Questo progetto si propone di elaborare segnali audio utilizzando un approccio sequenziale. L'obiettivo \`e implementare trasformazioni nel dominio delle frequenze per applicare un filtro passa-basso e produrre un segnale audio modificato. Il processo comprende le seguenti fasi:
+I parametri $r_s, r_r\in\mathbb{R}$ rappresentano i tassi di riproduzione delle due tipologie di cellule. Il parametro $K\in\mathbb{R}$ indica la capacità massima dell'ambiente di sostenere le cellule. La concentrazione del farmaco è rappresentata dalla variabile $c_f(t)$, che può variare nel tempo. I parametri $m_s, m_r\in\mathbb{R}$ determinano rispettivamente la mortalità delle cellule suscettibili e resistenti, con $m_s > m_r$. Nel sistema, le cellule possono mutare da una tipologia all'altra. Le cellule suscettibili possono diventare resistenti attraverso un processo influenzato dal parametro $\beta\in\mathbb{R}$. Questa mutazione è rappresentata dal termine $-\beta n_s$ nella prima equazione e $\beta n_s$ nella seconda equazione. Analogamente, le cellule resistenti possono tornare alla tipologia suscettibile attraverso il termine $\gamma n_s$, con $\gamma \in\mathbb{R}$. Infine, il termine $\alpha c_f n_r$ tiene conto delle cellule suscettibili che mutano in resistenti a causa del trattamento farmacologico. Questo termine tiene conto dell'interazione tra il farmaco presente nel sistema e le cellule suscettibili che mutano in resistenti.
+
+\section{Espressione del sistema in forma di stato e calcolo del sistema linearizzato intorno ad una coppia di equilibrio}
+
+Innanzitutto, esprimiamo il sistema~\eqref{eq:system} nella seguente forma di stato
+%
+\begin{subequations}
+\begin{align}\label{eq:state_form}
+	\dot{x} &= f(x,u)
+	\\
+	y &= h(x,u).
+\end{align}
+\end{subequations}
+%
+Pertanto, andiamo individuare lo stato $x$, l'ingresso $u$ e l'uscita $y$ del sistema come segue 
+%
+\begin{align*}
+x := \begin{bmatrix}
+	    x_1\\
+            x_2     
+	\end{bmatrix} := \begin{bmatrix}
+	    n_s\\
+            n_r     
+	\end{bmatrix}, \quad u := c_f, \quad y := n_r.
+\end{align*}
+%
+Coerentemente con questa scelta, ricaviamo dal sistema~\eqref{eq:system} la seguente espressione per le funzioni $f$ ed $h$
+%
+\begin{align*}
+	f(x,u) &:= \begin{bmatrix}
+	    f_1(x,u)\\
+            f_2(x,u)     
+	\end{bmatrix} := \begin{bmatrix}
+	    -r_s ln(\frac{x_1 + x_2}{K}) - m_s ux_1 - \beta x_1 + \gamma x_2 - \alpha ux_1\\
+            -r_r ln(\frac{x_1 + x_2}{K}) - m_s ux_2 - \beta x_1 - \gamma x_2 + \alpha ux_1     
+	\end{bmatrix}
+	\\
+	h(x,u) &:= x_2.
+\end{align*}
+%
+Una volta calcolate $f$ ed $h$ esprimiamo~\eqref{eq:system} nella seguente forma di stato
+%
+\begin{subequations}\label{eq:our_system_state_form}
+\begin{align}
+	\begin{bmatrix}
+		\dot{x}_1
+		\\
+		\dot{x}_2
+	\end{bmatrix} &= \begin{bmatrix}
+	    -r_s ln(\frac{x_1 + x_2}{K}) - m_s ux_1 - \beta x_1 + \gamma x_2 - \alpha ux_1\\
+            -r_r ln(\frac{x_1 + x_2}{K}) - m_s ux_2 - \beta x_1 - \gamma x_2 + \alpha ux_1    \end{bmatrix} \label{eq:state_form_1}
+	\\
+	y &= x_2.
+\end{align}
+\end{subequations}
+%
+Da specifiche ci viene dato il valore di equilibrio $ x_e = \begin{bmatrix}
+		\dot{x}_1
+		\\
+		\dot{x}_2
+	\end{bmatrix} = 
+    \begin{bmatrix}
+		n_{s,e}
+		\\
+		n_{r,e}
+	\end{bmatrix} =
+ \begin{bmatrix}
+		100
+		\\
+		100
+	\end{bmatrix}$
+
+A partire dal quale troviamo la coppia di equilibrio $(x_e, u_e)$ di~\eqref{eq:our_system_state_form}, risolvendo il seguente sistema di equazioni
+%
+\begin{align}
+	\begin{bmatrix}
+		0
+		\\
+		0
+	\end{bmatrix} = \begin{bmatrix}
+		-0.7u100 - 0.2u100
+		\\
+		-0.15u100 + 0.2u100
+	\end{bmatrix}
+\end{align}
+%
+dal quale otteniamo
+%
+\begin{align}
+	x_e := \begin{bmatrix}
+		100
+		\\
+		100
+	\end{bmatrix},  \quad u_e = 0\label{eq:equilibirum_pair}
+\end{align}
+%
+Definiamo le variabili alle variazioni $\delta x$, $\delta u$ e $\delta y$ come 
+%
+\begin{align*}
+	\delta x &= x-x_e, 
+	\quad
+	\delta u = u-u_e, 
+	\quad
+	\delta y = y-y_e.
+\end{align*}
+%
+L'evoluzione del sistema espressa nelle variabili alle variazioni pu\`o essere approssimativamente descritta mediante il seguente sistema lineare
+%
+\begin{subequations}\label{eq:linearized_system}
+\begin{align}
+	\delta \dot{x} &= A\delta x + B\delta u
+	\\
+	\delta y &= C\delta x + D\delta u,
+\end{align}
+\end{subequations}
+%
+dove le matrici $A$, $B$, $C$ e $D$ vengono calcolate come
+%
+\begin{subequations}\label{eq:matrices}
+\begin{align}
+	A &= \begin{bmatrix}
+		\frac{\partial f_1(x,u)}{\partial x_1} & \frac{\partial f_1(x,u)}{\partial x_2}
+		\\
+		\frac{\partial f_2(x,u)}{\partial x_1} & \frac{\partial f_2(x,u)}{\partial x_2}
+	\end{bmatrix}_{\substack{x = x_e\\u = u_e}} = \begin{bmatrix}
+		-1.05 & -0.45
+		\\
+		-0.35 & -0.95
+	\end{bmatrix}
+	\\
+	B &= \begin{bmatrix}
+		\frac{\partial f_1(x,u)}{\partial u}
+		\\
+		\frac{\partial f_2(x,u)}{\partial u}
+	\end{bmatrix}_{\substack{x = x_e\\u = u_e}} = \begin{bmatrix}
+	    -90 \\ 5
+	\end{bmatrix}
+	\\
+	C &= \begin{bmatrix}
+		\frac{\partial h(x,u)}{\partial x_1}
+		&
+		\frac{\partial h(x,u)}{\partial x_2}
+	\end{bmatrix}_{\substack{x = x_e\\u = u_e}} = \begin{bmatrix}
+	    0 & 1
+	\end{bmatrix}
+	\\
+	D &= \begin{bmatrix}
+		\frac{\partial h(x,u)}{\partial u}
+	\end{bmatrix}_{\substack{x = x_e\\u = u_e}} = \begin{bmatrix}
+	    0
+	\end{bmatrix}
+\end{align}
+\end{subequations}
+%
+\section{Calcolo Funzione di Trasferimento}
+
+In questa sezione, andiamo a calcolare la funzione di trasferimento $G(s)$ dall'ingresso $\delta u$ all'uscita $\delta y$ mediante la seguente formula 
+%
+%
+\begin{align}\label{eq:transfer_function}
+G(s) = C(sI -A)^{-1} B+D = \frac{5(s+7.35)}{(s+1.4)(s+0.6)}.
+\end{align}
+
+Dunque il sistema linearizzato~\eqref{eq:linearized_system} è caratterizzato dalla funzione di trasferimento~\eqref{eq:transfer_function} con $2$ poli $p_1 = -1.4 , p_2=-0.6$ e uno zero $z_1 =-7.35$.\\ In Figura ~\ref{Figura1} mostriamo il corrispondente diagramma di Bode. 
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_1.jpg}
+    \caption{}
+    \label{Figura1}
+\end{figure}
+
+\section{Mappatura specifiche del regolatore}
+\label{sec:specifications}
+
+Le specifiche da soddisfare sono
 \begin{itemize}
-    \item Lettura di un file audio in formato \texttt{.wav};
-    \item Calcolo della Trasformata Discreta di Fourier (DFT);
-    \item Applicazione di un filtro passa-basso nel dominio delle frequenze;
-    \item Calcolo della Trasformata Inversa (IDFT);
-    \item Scrittura del segnale audio modificato su file;
-    \item Generazione di un report sui tempi di esecuzione.
+	\item[1)]Errore a regime nullo con riferimeto a gradino
+	\\
+	\item[2)] $M_f \ge 40\degree$ 
+ \\
+	\item[3)] $S\%\ge 7\%$: ovvero $M_f \ge 64.61\degree$
+ \\
+	\item[4)] $T_a,5 = 1s$. 
+ \\
+	\item[5)]$d(t)$ attenuato di almeno $60dB$ in $\begin{bmatrix}
+	    0 , & 0.05
+	\end{bmatrix}$
+ \\
+	\item[6)]$n(t)$ attenuato di almeno $90dB$ in $\begin{bmatrix}
+	    10^4 , & 10^6
+	\end{bmatrix}$
+\end{itemize}
+%
+Andiamo ad effettuare la mappatura punto per punto le specifiche richieste.
+
+\begin{itemize}
+	\item[1)] L'errore a regime nullo si traduce nella necessit\`a di un polo nell'origine.\\
+	\item[2)] Le specifiche 2 e 3 sono entrambe sul margine di fase, perci\`o andiamo a soddisfare la pi\`u stringente. Otteniamo quindi $M_f\ge64.61\degree$.
+	\\
+	\item[3)] Dalla specifica 4, sul tempo di assestamento $T_{a,5}$, ricaviamo: $\omega _c \ge \frac{300}{M_f 1} \approx 4.64rad/s$.
+	\item[4)] Dalla specifica 5 ricaviamo $|L(j\omega)|_{dB} \ge 60dB$ in $\begin{bmatrix}
+	    0 , & 0.05
+	\end{bmatrix}$.\\
+	\item[5)] Dalla specifica 6 ricaviamo $|L(j\omega)|_{dB} \le -90dB$ in$\begin{bmatrix}
+	    10^4 , & 10^6
+	\end{bmatrix}$.\\
 \end{itemize}
 
-\subsection{Fase di test}
-Tutti i codici sviluppati verranno testati su due macchine differenti per apprezzare la differenza tra architetture delle CPU e lo scarto generazionale delle GPU. Le macchine in questione hanno le seguenti specifiche:
+Pertanto, in Figura ~\ref{Figura2}, mostriamo il diagramma di Bode della funzione di trasferimento $G(s)$ con le zone proibite emerse dalla mappatura delle specifiche.
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_3.jpg}
+    \caption{}
+    \label{Figura2}
+\end{figure}
+\section{Sintesi del regolatore statico}
+\label{sec:static_regulator}
 
-\\
+In questa sezione progettiamo il regolatore statico $R_s(s)$ partendo dalle analisi fatte in sezione~\ref{sec:specifications}.
+Vista la specifica 1 sull'errore a regime nullo, il regolatore dovrà avere un polo nell'origine. Pertanto questo sarà nella seguente forma.
+\begin{align}\label{eq:R_s}
+R_s(s)=\frac1s
+\end{align}
 
-\begin{tabular}{|c|c|c|}
-\hline
-\textbf{} & \textbf{Macchina 1} & \textbf{Macchina 2} \\ \hline
-CPU   & Intel Core i7-12650H  & AMD Ryzen 7 8845HS\\ \hline
-GPU    & NVIDIA GeForce 3050 & NVIDIA GeForce RTX 4050 Max-Q \\ \hline
-O.S. & Ubuntu 22.04 on wsl & Fedora Linux 41 \\ \hline
-\end{tabular}
-
-\section{Implementazione Sequenziale}
-Il codice \`e stato scritto in linguaggio \texttt{C} e utilizza le librerie standard per la manipolazione di file e la misurazione del tempo. La struttura principale del programma comprende:
-
-\subsection{Lettura e Scrittura di File Audio}
-I file audio sono letti e scritti in formato \texttt{.wav} standard, utilizzando un'intestazione di 44 byte per rappresentare i metadati del file. Le seguenti funzioni implementano la lettura e scrittura dei file audio:
-
-\lstinputlisting[language=C, firstline=36, lastline=57, caption={Funzione per leggere file audio .wav.}]{DFTsequenziale.c}
-
-\lstinputlisting[language=C, firstline=58, lastline=111, caption={Funzione per scrivere file audio .wav.}]{DFTsequenziale.c}
-
-\subsection{Trasformata Discreta di Fourier (DFT)}
-La DFT converte un segnale audio dal dominio del tempo a quello delle frequenze. La funzione \texttt{dft()} implementa la seguente formula:
-\begin{equation}
-    X[k] = \sum_{n=0}^{N-1} x[n] \cdot \cos\left(\frac{2\pi k n}{N}\right)
-\end{equation}
-
-\lstinputlisting[language=C, firstline=112, lastline=121, caption={Implementazione della DFT.}]{DFTsequenziale.c}
-
-\subsection{Filtro Passa-Basso}
-Un filtro passa-basso \`e applicato nel dominio delle frequenze per rimuovere le componenti indesiderate. La funzione \texttt{filtro()} azzera le frequenze al di fuori di una soglia specificata:
-
-\lstinputlisting[language=C, firstline=122, lastline=130, caption={Applicazione del filtro passa-basso.}]{DFTsequenziale.c}
-
-\subsection{Trasformata Inversa (IDFT)}
-La IDFT riporta il segnale audio dal dominio delle frequenze al dominio del tempo. La funzione \texttt{idft()} \`e basata sulla formula:
-\begin{equation}
-    x[n] = \frac{1}{N} \sum_{k=0}^{N-1} X[k] \cdot \cos\left(\frac{2\pi k n}{N}\right)
-\end{equation}
-
-\lstinputlisting[language=C, firstline=131, lastline=141, caption={Implementazione della IDFT.}]{DFTsequenziale.c}
-
-\subsection{Misurazione delle Prestazioni}
-I tempi di esecuzione delle diverse fasi del programma vengono misurati e riportati in un file di testo:
-
-\lstinputlisting[language=C, firstline=142, lastline=159, caption={Funzione per scrivere il report dei tempi.}]{DFTsequenziale.c}
-
-\section{Esecuzione del Programma}
-La funzione \texttt{main()} coordina l'intero processo, dalla lettura del file audio alla scrittura dei risultati. Viene utilizzata la libreria \texttt{time.h} per misurare i tempi di esecuzione:
-
-\lstinputlisting[language=C, firstline=160, lastline=231, caption={Funzione main del programma.}]{DFTsequenziale.c}
-
-\section{Risultati}
-Il programma \`e stato testato su un file audio mono con 44.1 kHz di frequenza di campionamento e una durata di 0,5s e 5s . 
-
-I risultati della applicazione del filtro si trovano nella directory \texttt{./output}, ogni file generato dal programma possiede nel nome il timestamp dell'esecuzione nel formato \textt{Ymd\_HMS} (anno, mese, giorno, ore, minuti, secondi).
-
-I tempi di esecuzione sono riportati nei file all'interndo della directory \texttt{./reports}. I risultati mostrano tempi di calcolo consistenti con le complessit\`a delle operazioni.
-
-Le seguenti tabelle mostrano i risultati ottenuti su entrambe le macchine e entrambi i file di input.
+Dunque, definiamo la funzione estesa $G_e(s) = R_s(s)G(s)$ e, in Figura ~\ref{Figura3}, mostriamo il suo diagramma di Bode per verificare se e quali zone proibite vengono attraversate.
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_4.jpg}
+    \caption{}
+    \label{Figura3}
+\end{figure}
+Da Figura ~\ref{Figura3}, emerge che la $G_e(s)$ non rispetta i vincoli sul disturbo di uscita $A_d$, sul margine di fase $M_f$ e sul tempo di assestamento $\omega_{e,min}$
 
 
+\section{Sintesi del regolatore dinamico}
+
+In questa sezione, progettiamo il regolatore dinamico $R_d(s)$. 
+%
+Dalle analisi fatte in Sezione~\ref{sec:static_regulator}, notiamo di essere nello Scenario di tipo B. Dunque, progettiamo $R_d(s)$ riccorrendo ad una rete anticipatrice. Utilizziamo le formule di inversione per calcolare $\alpha$ e $\tau$ di $R_d(s)$, prendendo $M_f^*=M_{f,spec}+20$ e $\omega_c^=100$. Otteniamo quindi:
+
+\begin{align}\label{eq:R_s}
+R_s(s)=\frac{1+\tau s}{1+\tau\alpha s}
+\end{align}
+
+Al fine di rispettare il vincolo sul disturbo $n_d$, è stato aggiunto un polo ad alta frequenza $\tau_{\text{hfreq}}$. Di conseguenza, il regolatore dinamico assume la seguente forma finale.
+
+\begin{align}\label{eq:R_s}
+R_s(s)=\frac{1+\tau s}{(1+\tau\alpha s)(1+\tau_{hfreq})s}\ \ \text{con } \tau_{\text{hfreq}}=\frac1{500}
+\end{align}
+
+In Figura ~\ref{Figura4}, mostriamo il diagramma di Bode della funzione d'anello $L(s) = R_d(s) G_e(s)$
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_5.jpg}
+    \caption{}
+    \label{Figura4}
+\end{figure}
+\section{Test sul sistema linearizzato}
+
+In questa sezione, testiamo l'efficacia del controllore progettato sul sistema linearizzato considerando in primo luogo le risposte al riferimento a gradino $\omega(t)$ e ai rumori $n(t)$ e $d(t)$. Per poi ottenere l'uscita complessiva $y_{\text{tot}}$ sommando le singole risposte per il princio di sovrapposizione degli effetti.
+
+\begin{subequations}\label{eq:Risposta1}
+\begin{align}
+ y_\omega &= F(s)W(s)
+\end{align}
+\end{subequations}
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_6.jpg}
+    \caption{}
+    \label{Figura5}
+\end{figure}
+\begin{subequations}\label{eq:Risposta1}
+\begin{align}
+ y_d &= S(s)D(s)
+\end{align}
+\end{subequations}
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_7.jpg}
+    \caption{}
+    \label{Figura6}
+\end{figure}
+\begin{subequations}\label{eq:Risposta1}
+\begin{align}
+ y_\omega &= -F(s)N(s)
+\end{align}
+\end{subequations}
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_8.jpg}
+    \caption{}
+    \label{Figura7}
+\end{figure}
+
+\begin{subequations}\label{eq:Risposta1}
+\begin{align}
+ y_{\text{tot}}&= y_\omega+y_d+y_n
+\end{align}
+\end{subequations}
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_9.jpg}
+    \caption{}
+    \label{Figura8}
+\end{figure}
+
+Da Figura~\ref{Figura8} notiamo che l'uscita soddisfa i vincoli relativi alla sovraelongazione percentuale e al tempo di assestamento.
+
+\section{Test sul sistema non lineare}
+
+In questa sezione, testiamo l'efficacia del controllore progettato sul modello non lineare.
+
+Per fare ciò dovremo:
+
+\begin{itemize}
+	\item[1)] Aggiungere $u_e$ in ingresso al sistema come parte dell'ingresso totale $u$, quindi $u = \delta u + u_e$. L'uscita sarà $y$ anziché $\delta y$.
+ \\
+        \item[2)]Sottrarre $y_e$ in uscita al sistema, così da avere l'uscita $\delta y = y - y_e$. Questo consentirà di calcolare l'errore $e$ sottraendo$\delta y$ dal riferimento $\omega$ e utilizzarlo come ingresso per il regolatore.
+\end{itemize}
+
+In figura mostreremo l'uscita del sistema non lineare considerando i $n(t)$ e $d(t)$.
+\begin{figure}[H]
+    \centering
+\includegraphics[width=110mm]{images/figure_10.jpg}
+    \caption{}
+    \label{Figura9}
+\end{figure}
+\section{Conclusioni}
+
+In conclusione possiamo apprezzare come sia il sistema lineare in anello chiuso che quello non lineare rispettino le specifiche assegnate, e che, esaurito il transitorio, l'uscita tende a seguire il riferimento $\omega(t)$ assegnato.
 \end{document}
+
