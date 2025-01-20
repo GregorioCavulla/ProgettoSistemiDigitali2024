@@ -1,5 +1,9 @@
-//Filtro kernel con float e Accessi coalescenti in memoria
-
+//Filtro kernel con float CI HO MESSO QUESTO SNIPPET DI CODICE PRIMA DI LANCIARE I KERNEL  cudaOccupancyMaxPotentialBlockSize
+/*  // Determina la configurazione ottimale
+    cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, dftKernel, 0, 0);
+    // Calcola il numero di blocchi richiesto per coprire tutti gli elementi
+    gridSize = (N + blockSize - 1) / blockSize;
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -100,30 +104,16 @@ void writeWavFile(const char *filename, float *x, int N) {
 
 // Kernel per calcolare la DFT (solo parte reale)
 __global__ void dftKernel(const float *x, float *X_real, int N) {
-    // Memoria condivisa per blocco
-    __shared__ float shared_x[256]; // Assumiamo blockDim.x <= 256
-
     int k = threadIdx.x + blockIdx.x * blockDim.x;
     if (k < N) {
         float sum_real = 0.0;
-
-        // Carica i dati nella memoria condivisa
-        for (int n = threadIdx.x; n < N; n += blockDim.x) {
-            shared_x[threadIdx.x] = x[threadIdx.x + blockIdx.x * blockDim.x];
-            __syncthreads();
-
-            // Calcolo usando la memoria condivisa
-            for (int i = 0; i < blockDim.x; i++) {
-                float angle = 2.0 * PI * k * (blockIdx.x * blockDim.x + i) / N;
-                sum_real += shared_x[i] * cos(angle);
-            }
-            __syncthreads();
+        for (int n = 0; n < N; n++) {
+            float angle = 2.0 * PI * k * n / N;
+            sum_real += x[n] * cos(angle);
         }
-
         X_real[k] = sum_real;
     }
 }
-
 
 // Funzione che applica un filtro passa-basso al segnale audio
 __global__ void filtroKernel(float *X_real, int N, int fc) {
@@ -135,29 +125,16 @@ __global__ void filtroKernel(float *X_real, int N, int fc) {
 
 // Kernel per calcolare la IDFT (solo parte reale)
 __global__ void idftKernel(const float *X_real, float *x, int N) {
-    __shared__ float shared_X_real[256]; // Assumiamo blockDim.x <= 256
-
     int n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n < N) {
         float sum = 0.0;
-
-        // Carica i dati nella memoria condivisa
-        for (int k = threadIdx.x; k < N; k += blockDim.x) {
-            shared_X_real[threadIdx.x] = X_real[threadIdx.x + blockIdx.x * blockDim.x];
-            __syncthreads();
-
-            // Calcolo usando la memoria condivisa
-            for (int i = 0; i < blockDim.x; i++) {
-                float angle = 2.0 * PI * (blockIdx.x * blockDim.x + i) * n / N;
-                sum += shared_X_real[i] * cos(angle);
-            }
-            __syncthreads();
+        for (int k = 0; k < N; k++) {
+            float angle = 2.0 * PI * k * n / N;
+            sum += X_real[k] * cos(angle);
         }
-
         x[n] = sum / N;
     }
 }
-
 
 // Funzione per scrivere un report dei tempi di esecuzione
 void writeReport(const char *filename, double dftTime, double filterTime, double idftTime, double totalTime) {
@@ -228,14 +205,25 @@ int main(int argc, char *argv[]) {
 
     // Configurazione kernel
     int blockSize = 256;
+    int minGridSize;
     int gridSize = (N + blockSize - 1) / blockSize;
 
-    // Calcolo DFT
+     // Determina la configurazione ottimale
+    cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, dftKernel, 0, 0);
+    // Calcola il numero di blocchi richiesto per coprire tutti gli elementi
+    gridSize = (N + blockSize - 1) / blockSize;
+
+    // Calcolo DFT  
     start = clock();
     dftKernel<<<gridSize, blockSize>>>(d_x, d_X_real, N);
     cudaDeviceSynchronize();
     end = clock();
     dftTime = (double)(end - start) / CLOCKS_PER_SEC;
+
+    // Determina la configurazione ottimale
+    cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, dftKernel, 0, 0);
+    // Calcola il numero di blocchi richiesto per coprire tutti gli elementi
+    gridSize = (N + blockSize - 1) / blockSize;
 
     // Applicazione filtro passa-basso
     start = clock();
@@ -243,6 +231,11 @@ int main(int argc, char *argv[]) {
     cudaDeviceSynchronize();
     end = clock();
     filterTime = (double)(end - start) / CLOCKS_PER_SEC;
+
+     // Determina la configurazione ottimale
+    cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, dftKernel, 0, 0);
+    // Calcola il numero di blocchi richiesto per coprire tutti gli elementi
+    gridSize = (N + blockSize - 1) / blockSize;
 
     // Calcolo IDFT
     start = clock();
