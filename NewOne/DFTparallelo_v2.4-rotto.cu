@@ -1,4 +1,4 @@
-//Filtro nel kernel della DFT
+//Filtro kernel con float
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,39 +98,64 @@ void writeWavFile(const char *filename, float *x, int N) {
     fclose(file);
 }
 
-// Kernel per calcolare la DFT (solo parte reale)
-__global__ void dftKernel(const float *x, float *X_real, int N, int fc) {
-    int k = threadIdx.x + blockIdx.x * blockDim.x;
+// Kernel per calcolare la DFT (ottimizzato con memoria condivisa)
+__global__ void dftKernel(const float *x, float *X_real, int N) {
+    __shared__ float shared_x[256];
+    int tid = threadIdx.x;
+    int k = blockIdx.x * blockDim.x + tid;
+
     if (k < N) {
         float sum_real = 0.0;
-        for (int n = 0; n < N; n++) {
-            float angle = 2.0 * PI * k * n / N;
-            sum_real += x[n] * cos(angle);
+        for (int n = tid; n < N; n += blockDim.x) {
+            shared_x[tid] = x[n];
+            __syncthreads();
+
+            for (int i = 0; i < blockDim.x && (blockIdx.x * blockDim.x + i) < N; i++) {
+                float angle = 2.0 * PI * k * (blockIdx.x * blockDim.x + i) / N;
+                sum_real += shared_x[i] * cos(angle);
+            }
+
+            __syncthreads();
         }
         X_real[k] = sum_real;
     }
+}
 
-    //filtro
-    if (k < N && (k > fc && k < N - fc)) {
-        X_real[k] = 0.0;
+// Kernel per applicare un filtro passa-basso (ottimizzato)
+__global__ void filtroKernel(float *X_real, int N, int fc) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
+    if (k < N) {
+        if (k > fc && k < N - fc) {
+            X_real[k] = 0.0;
+        }
     }
 }
 
-// Kernel per calcolare la IDFT (solo parte reale)
+// Kernel per calcolare la IDFT (ottimizzato con memoria condivisa)
 __global__ void idftKernel(const float *X_real, float *x, int N) {
-    int n = threadIdx.x + blockIdx.x * blockDim.x;
+    __shared__ float shared_X_real[256];
+    int tid = threadIdx.x;
+    int n = blockIdx.x * blockDim.x + tid;
+
     if (n < N) {
         float sum = 0.0;
-        for (int k = 0; k < N; k++) {
-            float angle = 2.0 * PI * k * n / N;
-            sum += X_real[k] * cos(angle);
+        for (int k = tid; k < N; k += blockDim.x) {
+            shared_X_real[tid] = X_real[k];
+            __syncthreads();
+
+            for (int i = 0; i < blockDim.x && (blockIdx.x * blockDim.x + i) < N; i++) {
+                float angle = 2.0 * PI * (blockIdx.x * blockDim.x + i) * n / N;
+                sum += shared_X_real[i] * cos(angle);
+            }
+
+            __syncthreads();
         }
         x[n] = sum / N;
     }
 }
 
 // Funzione per scrivere un report dei tempi di esecuzione
-void writeReport(const char *filename, double dftTime, double idftTime, double totalTime) {
+void writeReport(const char *filename, double dftTime, double filterTime, double idftTime, double totalTime) {
     FILE *file = fopen(filename, "w");
     if (file == NULL) {
         printf("Errore nell'apertura del file %s\n", filename);
@@ -139,7 +164,8 @@ void writeReport(const char *filename, double dftTime, double idftTime, double t
 
     fprintf(file, "Report tempi di esecuzione:\n");
     fprintf(file, "------------------------------------\n");
-    fprintf(file, "DFT + Filtro  : %f secondi\n", dftTime);
+    fprintf(file, "DFT  : %f secondi\n", dftTime);
+    fprintf(file, "Filtro: %f secondi\n", filterTime);
     fprintf(file, "IDFT : %f secondi\n", idftTime);
     fprintf(file, "Totale: %f secondi\n", totalTime);
     fprintf(file, "------------------------------------\n");
@@ -151,7 +177,7 @@ int main(int argc, char *argv[]) {
     float *x, *X_real, *y;
     int N;
     clock_t start, end;
-    double dftTime, idftTime;
+    double dftTime, filterTime, idftTime;
     char *filename;
 
     // Verifica che il numero di argomenti sia corretto
@@ -180,8 +206,8 @@ int main(int argc, char *argv[]) {
 
     // Percorsi per i file di output
     char outputFile[256], reportFile[256];
-    snprintf(outputFile, sizeof(outputFile), "./output/cuda_v2.1_output_%s.wav", timestamp);
-    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_v2.1_report_%s.txt", timestamp);
+    snprintf(outputFile, sizeof(outputFile), "./output/cuda_v2.4_output_%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_v2.4_report_%s.txt", timestamp);
 
     // Leggi il file audio
     readWavFile(filename, x, N);
@@ -199,12 +225,19 @@ int main(int argc, char *argv[]) {
     int blockSize = 256;
     int gridSize = (N + blockSize - 1) / blockSize;
 
-    // Calcolo DFT e applico filtro
+    // Calcolo DFT
     start = clock();
-    dftKernel<<<gridSize, blockSize>>>(d_x, d_X_real, N, 1000);
+    dftKernel<<<gridSize, blockSize>>>(d_x, d_X_real, N);
     cudaDeviceSynchronize();
     end = clock();
     dftTime = (double)(end - start) / CLOCKS_PER_SEC;
+
+    // Applicazione filtro passa-basso
+    start = clock();
+    filtroKernel<<<gridSize, blockSize>>>(d_X_real, N, 1000);
+    cudaDeviceSynchronize();
+    end = clock();
+    filterTime = (double)(end - start) / CLOCKS_PER_SEC;
 
     // Calcolo IDFT
     start = clock();
@@ -220,7 +253,7 @@ int main(int argc, char *argv[]) {
     writeWavFile(outputFile, y, N);
 
     // Scrivi il report dei tempi
-    writeReport(reportFile, dftTime, idftTime, dftTime + idftTime);
+    writeReport(reportFile, dftTime, filterTime, idftTime, dftTime + filterTime + idftTime);
 
     // Libera la memoria
     free(x);

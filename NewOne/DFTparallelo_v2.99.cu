@@ -1,4 +1,4 @@
-//Filtro nel kernel della DFT
+//Kernel DFT e IDFT con FMAF funzione per calcolare la DFT (solo parte reale) con FMA (Fused Multiply-Add) e la IDFT (solo parte reale) con FMA. Il filtro passa-basso è stato implementato come un kernel separato. Questa versione del programma utilizza la funzione fmaf() per eseguire la moltiplicazione e l'addizione in un'unica operazione. Questo può portare a un miglioramento delle prestazioni in alcune situazioni, poiché l'hardware può eseguire le due operazioni in parallelo. Tuttavia, i risultati possono variare a seconda dell'architettura hardware e delle ottimizzazioni del compilatore. Si consiglia di testare le prestazioni su hardware specifico per valutare l'efficacia di questa tecnica di ottimizzazione.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,39 +98,44 @@ void writeWavFile(const char *filename, float *x, int N) {
     fclose(file);
 }
 
-// Kernel per calcolare la DFT (solo parte reale)
-__global__ void dftKernel(const float *x, float *X_real, int N, int fc) {
+// Kernel per calcolare la DFT (solo parte reale) con FMA
+__global__ void dftKernel(const float *x, float *X_real, int N) {
     int k = threadIdx.x + blockIdx.x * blockDim.x;
     if (k < N) {
-        float sum_real = 0.0;
+        float sum_real = 0.0f;
         for (int n = 0; n < N; n++) {
-            float angle = 2.0 * PI * k * n / N;
-            sum_real += x[n] * cos(angle);
+            float angle = 2.0f * PI * k * n / N;
+            float cos_val = cosf(angle);
+            sum_real = fmaf(x[n], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
         }
         X_real[k] = sum_real;
     }
+}
 
-    //filtro
+// Funzione che applica un filtro passa-basso al segnale audio
+__global__ void filtroKernel(float *X_real, int N, int fc) {
+    int k = threadIdx.x + blockIdx.x * blockDim.x;
     if (k < N && (k > fc && k < N - fc)) {
         X_real[k] = 0.0;
     }
 }
 
-// Kernel per calcolare la IDFT (solo parte reale)
+// Kernel per calcolare la IDFT (solo parte reale) con FMA
 __global__ void idftKernel(const float *X_real, float *x, int N) {
     int n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n < N) {
-        float sum = 0.0;
+        float sum = 0.0f;
         for (int k = 0; k < N; k++) {
-            float angle = 2.0 * PI * k * n / N;
-            sum += X_real[k] * cos(angle);
+            float angle = 2.0f * PI * k * n / N;
+            float cos_val = cosf(angle);
+            sum = fmaf(X_real[k], cos_val, sum); // FMA: sum += X_real[k] * cos_val
         }
         x[n] = sum / N;
     }
 }
 
 // Funzione per scrivere un report dei tempi di esecuzione
-void writeReport(const char *filename, double dftTime, double idftTime, double totalTime) {
+void writeReport(const char *filename, double dftTime, double filterTime, double idftTime, double totalTime) {
     FILE *file = fopen(filename, "w");
     if (file == NULL) {
         printf("Errore nell'apertura del file %s\n", filename);
@@ -139,7 +144,8 @@ void writeReport(const char *filename, double dftTime, double idftTime, double t
 
     fprintf(file, "Report tempi di esecuzione:\n");
     fprintf(file, "------------------------------------\n");
-    fprintf(file, "DFT + Filtro  : %f secondi\n", dftTime);
+    fprintf(file, "DFT  : %f secondi\n", dftTime);
+    fprintf(file, "Filtro: %f secondi\n", filterTime);
     fprintf(file, "IDFT : %f secondi\n", idftTime);
     fprintf(file, "Totale: %f secondi\n", totalTime);
     fprintf(file, "------------------------------------\n");
@@ -151,7 +157,7 @@ int main(int argc, char *argv[]) {
     float *x, *X_real, *y;
     int N;
     clock_t start, end;
-    double dftTime, idftTime;
+    double dftTime, filterTime, idftTime;
     char *filename;
 
     // Verifica che il numero di argomenti sia corretto
@@ -180,8 +186,8 @@ int main(int argc, char *argv[]) {
 
     // Percorsi per i file di output
     char outputFile[256], reportFile[256];
-    snprintf(outputFile, sizeof(outputFile), "./output/cuda_v2.1_output_%s.wav", timestamp);
-    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_v2.1_report_%s.txt", timestamp);
+    snprintf(outputFile, sizeof(outputFile), "./output/cuda_v2.99_output_%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/cuda_v2.99_report_%s.txt", timestamp);
 
     // Leggi il file audio
     readWavFile(filename, x, N);
@@ -199,12 +205,19 @@ int main(int argc, char *argv[]) {
     int blockSize = 256;
     int gridSize = (N + blockSize - 1) / blockSize;
 
-    // Calcolo DFT e applico filtro
+    // Calcolo DFT
     start = clock();
-    dftKernel<<<gridSize, blockSize>>>(d_x, d_X_real, N, 1000);
+    dftKernel<<<gridSize, blockSize>>>(d_x, d_X_real, N);
     cudaDeviceSynchronize();
     end = clock();
     dftTime = (double)(end - start) / CLOCKS_PER_SEC;
+
+    // Applicazione filtro passa-basso
+    start = clock();
+    filtroKernel<<<gridSize, blockSize>>>(d_X_real, N, 1000);
+    cudaDeviceSynchronize();
+    end = clock();
+    filterTime = (double)(end - start) / CLOCKS_PER_SEC;
 
     // Calcolo IDFT
     start = clock();
@@ -220,7 +233,7 @@ int main(int argc, char *argv[]) {
     writeWavFile(outputFile, y, N);
 
     // Scrivi il report dei tempi
-    writeReport(reportFile, dftTime, idftTime, dftTime + idftTime);
+    writeReport(reportFile, dftTime, filterTime, idftTime, dftTime + filterTime + idftTime);
 
     // Libera la memoria
     free(x);
