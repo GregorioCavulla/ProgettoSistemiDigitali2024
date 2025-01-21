@@ -1,4 +1,6 @@
 //Kernel DFT e IDFT con FMAF funzione per calcolare la DFT (solo parte reale) con FMA (Fused Multiply-Add) e la IDFT (solo parte reale) con FMA. Il filtro passa-basso è stato implementato come un kernel separato. Questa versione del programma utilizza la funzione fmaf() per eseguire la moltiplicazione e l'addizione in un'unica operazione. Questo può portare a un miglioramento delle prestazioni in alcune situazioni, poiché l'hardware può eseguire le due operazioni in parallelo. Tuttavia, i risultati possono variare a seconda dell'architettura hardware e delle ottimizzazioni del compilatore. Si consiglia di testare le prestazioni su hardware specifico per valutare l'efficacia di questa tecnica di ottimizzazione.
+//Unrolling dei loop
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,10 +105,50 @@ __global__ void dftKernel(const float *x, float *X_real, int N) {
     int k = threadIdx.x + blockIdx.x * blockDim.x;
     if (k < N) {
         float sum_real = 0.0f;
-        for (int n = 0; n < N; n++) {
-            float angle = 2.0f * PI * k * n / N;
-            float cos_val = cosf(angle);
+        float angle, cos_val;
+
+
+        for(int n = 0; n < N; n += 10){
+            angle = 2.0f * PI * k * n / N;
+            cos_val = cosf(angle);
             sum_real = fmaf(x[n], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+1 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+1], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+2 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+2], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+3 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+3], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+4 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+4], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+5 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+5], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+6 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+6], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+7 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+7], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+8 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+8], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
+            angle = 2.0f * PI * k * n+9 / N;
+            cos_val = cosf(angle);
+            sum_real = fmaf(x[n+9], cos_val, sum_real); // FMA: sum_real += x[n] * cos_val
+
         }
         X_real[k] = sum_real;
     }
@@ -125,10 +167,48 @@ __global__ void idftKernel(const float *X_real, float *x, int N) {
     int n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n < N) {
         float sum = 0.0f;
-        for (int k = 0; k < N; k++) {
-            float angle = 2.0f * PI * k * n / N;
-            float cos_val = cosf(angle);
+        float angle, cos_val;
+
+        for (int k = 0; k < N; k += 10) {
+            angle = 2.0f * PI * k * n / N;
+            cos_val = cosf(angle);
             sum = fmaf(X_real[k], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+1 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+1], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+2 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+2], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+3 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+3], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+4 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+4], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+5 / N;
+            cos_val = cosf(angle);    
+            sum = fmaf(X_real[k+5], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+6 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+6], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+7 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+7], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+8 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+8], cos_val, sum); // FMA: sum += X_real[k] * cos_val
+
+            angle = 2.0f * PI * k * n+9 / N;
+            cos_val = cosf(angle);
+            sum = fmaf(X_real[k+9], cos_val, sum); // FMA: sum += X_real[k] * cos_val
         }
         x[n] = sum / N;
     }
