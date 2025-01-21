@@ -108,7 +108,7 @@ void writeWavFile(const char *filename, float *x, int N) {
 // Kernel per la trasformata discreta di Fourier (DFT)
 __global__ void dftKernel(const float *x, Complesso *X, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    float angle;
+    float angle, cosAngle, sinAngle;
     float angleFactor = 2.0f * PI * i / N;
     float real = 0;
     float imag = 0;
@@ -118,44 +118,54 @@ __global__ void dftKernel(const float *x, Complesso *X, int N) {
         for (int j = 0; j < N; j+=10) {
 
             angle = angleFactor * j;
-            real = fmaf(x[j], cosf(angle), real);
-            imag = fmaf(-x[j], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j], cosAngle, real);
+            imag = fmaf(-x[j], sinAngle, imag);
 
             angle = angleFactor * (j+1);
-            real = fmaf(x[j+1], cosf(angle), real);
-            imag = fmaf(-x[j+1], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+1], cosAngle, real);
+            imag = fmaf(-x[j+1], sinAngle, imag);
 
             angle = angleFactor * (j+2);
-            real = fmaf(x[j+2], cosf(angle), real);
-            imag = fmaf(-x[j+2], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+2], cosAngle, real);
+            imag = fmaf(-x[j+2], sinAngle, imag);
 
             angle = angleFactor * (j+3);
-            real = fmaf(x[j+3], cosf(angle), real);
-            imag = fmaf(-x[j+3], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+3], cosAngle, real);
+            imag = fmaf(-x[j+3], sinAngle, imag);
 
             angle = angleFactor * (j+4);
-            real = fmaf(x[j+4], cosf(angle), real);
-            imag = fmaf(-x[j+4], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+4], cosAngle, real);
+            imag = fmaf(-x[j+4], sinAngle, imag);
 
             angle = angleFactor * (j+5);
-            real = fmaf(x[j+5], cosf(angle), real);
-            imag = fmaf(-x[j+5], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+5], cosAngle, real);
+            imag = fmaf(-x[j+5], sinAngle, imag);
 
             angle = angleFactor * (j+6);
-            real = fmaf(x[j+6], cosf(angle), real);
-            imag = fmaf(-x[j+6], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+6], cosAngle, real);
+            imag = fmaf(-x[j+6], sinAngle, imag);
 
             angle = angleFactor * (j+7);
-            real = fmaf(x[j+7], cosf(angle), real);
-            imag = fmaf(-x[j+7], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+7], cosAngle, real);
+            imag = fmaf(-x[j+7], sinAngle, imag);
 
             angle = angleFactor * (j+8);
-            real = fmaf(x[j+8], cosf(angle), real);
-            imag = fmaf(-x[j+8], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+8], cosAngle, real);
+            imag = fmaf(-x[j+8], sinAngle, imag);
 
             angle = angleFactor * (j+9);
-            real = fmaf(x[j+9], cosf(angle), real);
-            imag = fmaf(-x[j+9], sinf(angle), imag);
+            __sincosf(angle, &sinAngle, &cosAngle);
+            real = fmaf(x[j+9], cosAngle, real);
+            imag = fmaf(-x[j+9], sinAngle, imag);
         }
         // Salva il risultato nei valori complessi di output
         X[i].real = real;
@@ -189,62 +199,52 @@ __global__ void idftKernel(const Complesso *X, float *x, int N) {
         for (int j = 0; j < N; j+=10) {
 
             angle = angleFactor * j;
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+1);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+1].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+1].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+2);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+2].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+2].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+3);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+3].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+3].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+4);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+4].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+4].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+5);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+5].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+5].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+6);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+6].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+6].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+7);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+7].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+7].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+8);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+8].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+8].imag, sinAngle, x[i]);
             
             angle = angleFactor * (j+9);
-            cosAngle = cosf(angle);
-            sinAngle = sinf(angle);
+            __sincosf(angle, &sinAngle, &cosAngle);
             x[i] = fmaf(X[j+9].real, cosAngle, x[i]);
             x[i] = fmaf(-X[j+9].imag, sinAngle, x[i]);
         }
