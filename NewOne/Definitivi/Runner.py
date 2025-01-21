@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Directory e configurazioni
 program_dir = "./"  # Directory contenente i programmi eseguibili
-input_file = "./input/short_noise.wav"  # File di input da passare ai programmi
+input_file = "./input/mid_noise.wav"  # File di input da passare ai programmi
 report_dir = "./reports"  # Directory dei report generati
 dest_dir = "./reports_minimi"  # Directory per i report con tempi minimi
 sleep_time = 1  # Tempo in secondi da aspettare tra una esecuzione e l'altra
@@ -23,8 +23,8 @@ def execute_programs():
         program_path = os.path.join(program_dir, program)
         if os.access(program_path, os.X_OK):  # Controlla se il file è eseguibile
             print(f"Esecuzione del programma: {program}")
-            for i in range(5):
-                print(f"  Esecuzione {i + 1}/5...")
+            for i in range(3):
+                print(f"  Esecuzione {i + 1}/3...")
                 try:
                     # Esegue il programma con l'input specificato
                     subprocess.run([f"./{program_path}", input_file], check=True)
