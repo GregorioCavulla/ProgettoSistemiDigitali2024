@@ -117,10 +117,11 @@ __global__ void dftKernel(const float *x, Complesso *X, int N) {
 
         // Angolo base
         float angleFactor = 2.0f * PI * i / N;
+        float angle;
 
         // Iterazione sui campioni
         for (int j = 0; j < N; j++) {
-            float angle = angleFactor * j;
+            angle = angleFactor * j;
         // Usa fmaf per calcolare le parti reale e immaginaria
             real = fmaf(x[j], cosf(angle), real);
             imag = fmaf(-x[j], sinf(angle), imag);
@@ -153,10 +154,13 @@ __global__ void idftKernel(const Complesso *X, float *x, int N) {
     if (i < N) {
         x[i] = 0.0f;
 
+        float angleFactor = 2.0f * PI * i / N;
+        float angle, cosAngle, sinAngle;
+
         for (int j = 0; j < N; j++) {
-            float angle = 2.0f * PI * i * j / N;
-            float cosAngle = cosf(angle);
-            float sinAngle = sinf(angle);
+            angle = angleFactor * j;
+            cosAngle = cosf(angle);
+            sinAngle = sinf(angle);
 
             // Usa fmaf per combinare moltiplicazione e somma
             x[i] = fmaf(X[j].real, cosAngle, x[i]);
