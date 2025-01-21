@@ -1,4 +1,4 @@
-//filtro host con i float
+//Align degli indirizzi dei due float in memoria
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,12 +118,14 @@ __global__ void dftKernel(const float *x, Complesso *X, int N){
     }
 
 }
+//versione Nico testnv
+__global__ void filtro(Complesso *X, int N, int fc, int fs) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
 
-void filtro(Complesso *X, int N, int fc, int fs) {
-    // Calcolo dell'indice di taglio corrispondente alla frequenza fc
-    int cutoffIndex = (int)((fc * N) / fs);
-    
-    for (int k = 0; k < N; k++) {
+    if (k < N) {
+        // Calcolo dell'indice di taglio corrispondente alla frequenza fc
+        int cutoffIndex = (fc * N) / fs;
+
         // Applica il filtro passa-basso
         if (k > cutoffIndex && k < N - cutoffIndex) {
             X[k].real = 0;
@@ -131,6 +133,24 @@ void filtro(Complesso *X, int N, int fc, int fs) {
         }
     }
 }
+
+
+/* //versione old non funzionante
+__global__ void filtro(const Complesso *X, int N, int fc, int fs) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N) {
+        // Calcolo dell'indice di taglio corrispondente alla frequenza fc
+        int cutoffIndex = (int)((fc * N) / fs);
+        
+        // Applica il filtro passa-basso
+        if (i > cutoffIndex && i < N - cutoffIndex) {
+            X[i].real = 0;
+            X[i].imag = 0;
+        }
+    }
+}
+
+*/
 
 __global__ void idftKernel(const Complesso *X, float *x, int N){
 
@@ -195,8 +215,8 @@ int main(int argc, char *argv[]){
 
     char outputFile[256], reportFile[256];
 
-    snprintf(outputFile, sizeof(outputFile), "./output/output_Parallelo_v1.5C_%s.wav", timestamp);
-    snprintf(reportFile, sizeof(reportFile), "./reports/report_Parallelo_v1.5C_%s.txt", timestamp);
+    snprintf(outputFile, sizeof(outputFile), "./output/output_Parallelo_v3.0C_%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/report_Parallelo_v3.0C_%s.txt", timestamp);
 
     readWavFile(filename, x, N);
 
@@ -218,9 +238,8 @@ int main(int argc, char *argv[]){
     dftTime = (double)(stop - start) / CLOCKS_PER_SEC;
 
     start = clock();
-    cudaMemcpy(X, d_X, N * sizeof(Complesso), cudaMemcpyDeviceToHost);
-    filtro(X, N, 1000, 44100);
-    cudaMemcpy(d_X, X, N * sizeof(Complesso), cudaMemcpyHostToDevice);
+    filtro<<<gridSize, blockSize>>>(d_X, N, 1000, 44100);
+    cudaDeviceSynchronize();
     stop = clock();
     filterTime = (double)(stop - start) / CLOCKS_PER_SEC;
 
