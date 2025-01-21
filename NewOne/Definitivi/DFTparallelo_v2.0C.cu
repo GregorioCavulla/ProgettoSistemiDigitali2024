@@ -118,7 +118,7 @@ __global__ void dftKernel(const float *x, Complesso *X, int N){
     }
 
 }
-//versione Nico testnv
+
 __global__ void filtro(Complesso *X, int N, int fc, int fs) {
     int k = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -133,24 +133,6 @@ __global__ void filtro(Complesso *X, int N, int fc, int fs) {
         }
     }
 }
-
-
-/* //versione old non funzionante
-__global__ void filtro(const Complesso *X, int N, int fc, int fs) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < N) {
-        // Calcolo dell'indice di taglio corrispondente alla frequenza fc
-        int cutoffIndex = (int)((fc * N) / fs);
-        
-        // Applica il filtro passa-basso
-        if (i > cutoffIndex && i < N - cutoffIndex) {
-            X[i].real = 0;
-            X[i].imag = 0;
-        }
-    }
-}
-
-*/
 
 __global__ void idftKernel(const Complesso *X, float *x, int N){
 
