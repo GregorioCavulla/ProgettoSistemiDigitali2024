@@ -9,6 +9,7 @@
 #include <cuda.h>
 
 #define PI 3.14159265358979323846
+#define BLOCK_SIZE 256
 
 // Struttura per rappresentare un numero complesso con allineamento
 typedef struct __align__(8) {
@@ -107,7 +108,7 @@ void writeWavFile(const char *filename, float *x, int N) {
 
 // Kernel per la trasformata discreta di Fourier (DFT) con shared memory
 __global__ void dftKernel(const float *x, Complesso *X, int N) {
-    extern __shared__ float shared_x[]; // Memoria condivisa per i campioni audio
+    __shared__ float shared_x[BLOCK_SIZE]; // Memoria condivisa per i campioni audio
 
     int tid = threadIdx.x;
     int i = blockIdx.x * blockDim.x + tid;
@@ -238,7 +239,7 @@ __global__ void filtro(Complesso *X, int N, int fc, int fs) {
 
 // Kernel per la trasformata inversa discreta di Fourier (IDFT) con shared memory
 __global__ void idftKernel(const Complesso *X, float *x, int N) {
-    extern __shared__ Complesso shared_X[]; // Memoria condivisa per i valori complessi
+    __shared__ Complesso shared_X[BLOCK_SIZE]; // Memoria condivisa per i valori complessi
 
     int tid = threadIdx.x;
     int i = blockIdx.x * blockDim.x + tid;
@@ -247,7 +248,7 @@ __global__ void idftKernel(const Complesso *X, float *x, int N) {
     float angle, cosAngle, sinAngle;
     float angleFactor = 2.0f * PI * i / N;
     float temp = 0.0f;
-
+// Complesso shared_X[blockDim.x];
     for (int blockOffset = 0; blockOffset < N; blockOffset += blockDim.x) {
         // Copia i dati nella memoria condivisa
         int idx = blockOffset + tid;
