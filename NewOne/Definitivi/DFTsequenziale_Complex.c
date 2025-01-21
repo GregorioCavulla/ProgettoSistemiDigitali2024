@@ -209,8 +209,8 @@ int main(int argc, char *argv[] ) {
 
     // Percorsi per i file di output
     char outputFile[256], reportFile[256];
-    snprintf(outputFile, sizeof(outputFile), "./output/sequenzialeComplesso_output_%s.wav", timestamp);
-    snprintf(reportFile, sizeof(reportFile), "./reports/sequenzialeComplesso_report_%s.txt", timestamp);
+    snprintf(outputFile, sizeof(outputFile), "./output/output_Sequenziale_v1.0C%s.wav", timestamp);
+    snprintf(reportFile, sizeof(reportFile), "./reports/report_Sequenziale_v1.0C%s.txt", timestamp);
 
     // Leggi il file audio
     readWavFile(filename, x, N);
