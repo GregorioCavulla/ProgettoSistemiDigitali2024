@@ -1,7 +1,7 @@
 Report tempi di esecuzione:
 ------------------------------------
-DFT  : 2.690596 secondi
-Filtro: 0.000705 secondi
-IDFT : 2.566734 secondi
-Totale: 5.258035 secondi
+DFT  : 6.141426 secondi
+Filtro: 0.001641 secondi
+IDFT : 6.226619 secondi
+Totale: 12.369686 secondi
 ------------------------------------
