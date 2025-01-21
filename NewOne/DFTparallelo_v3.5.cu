@@ -589,3 +589,176 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+
+
+/*
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <time.h>
+#include <stdint.h>
+#include <sys/stat.h>
+#include <cuda.h>
+
+define PI 3.14159265358979323846
+
+// Struttura per rappresentare numeri complessi
+typedef struct {
+    float real;
+    float imag;
+} Complex;
+
+// Funzione per creare una stringa di timestamp
+void createTimestamp(char *buffer, size_t size) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buffer, size, "%Y%m%d_%H%M%S", t);
+}
+
+// Funzione per leggere l'intestazione di un file .wav e determinare la lunghezza
+int getWavFileLength(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        printf("Errore nell'apertura del file %s\n", filename);
+        exit(1);
+    }
+
+    uint8_t header[44];
+    fread(header, sizeof(uint8_t), 44, file);
+    int dataSize = header[40] | (header[41] << 8) | (header[42] << 16) | (header[43] << 24);
+    fclose(file);
+    return dataSize / sizeof(int16_t);
+}
+
+// Funzione per leggere i campioni audio da un file .wav
+void readWavFile(const char *filename, float *x, int N) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        printf("Errore nell'apertura del file %s\n", filename);
+        exit(1);
+    }
+
+    fseek(file, 44, SEEK_SET);
+    int16_t *buffer = (int16_t *)malloc(N * sizeof(int16_t));
+    fread(buffer, sizeof(int16_t), N, file);
+    for (int i = 0; i < N; i++) {
+        x[i] = (float)buffer[i];
+    }
+
+    free(buffer);
+    fclose(file);
+}
+
+// Kernel per calcolare la DFT (parte reale e immaginaria) con FMA
+__global__ void dftKernel(const float *x, Complex *X, int N) {
+    int k = threadIdx.x + blockIdx.x * blockDim.x;
+    if (k < N) {
+        Complex sum = {0.0f, 0.0f};
+
+        for (int n = 0; n < N; ++n) {
+            float angle = 2.0f * PI * k * n / N;
+            float cos_val = cosf(angle);
+            float sin_val = sinf(angle);
+
+            sum.real = fmaf(x[n], cos_val, sum.real);
+            sum.imag = fmaf(-x[n], sin_val, sum.imag);
+        }
+
+        X[k] = sum;
+    }
+}
+
+// Kernel per applicare un filtro passa-basso
+__global__ void filtroKernel(Complex *X, int N, int fc) {
+    int k = threadIdx.x + blockIdx.x * blockDim.x;
+    if (k < N && (k > fc && k < N - fc)) {
+        X[k].real = 0.0f;
+        X[k].imag = 0.0f;
+    }
+}
+
+// Kernel per calcolare la IDFT (parte reale) con FMA
+__global__ void idftKernel(const Complex *X, float *x, int N) {
+    int n = threadIdx.x + blockIdx.x * blockDim.x;
+    if (n < N) {
+        float sum = 0.0f;
+
+        for (int k = 0; k < N; ++k) {
+            float angle = 2.0f * PI * k * n / N;
+            float cos_val = cosf(angle);
+            float sin_val = sinf(angle);
+
+            sum = fmaf(X[k].real, cos_val, sum);
+            sum = fmaf(X[k].imag, sin_val, sum);
+        }
+
+        x[n] = sum / N;
+    }
+}
+
+// Funzione principale
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Utilizzo: %s <file_audio.wav>\n", argv[0]);
+        exit(1);
+    }
+
+    const char *filename = argv[1];
+
+    // Creazione delle directory output e reports
+    mkdir("./output", 0777);
+    mkdir("./reports", 0777);
+
+    // Determina la lunghezza del file audio
+    int N = getWavFileLength(filename);
+
+    // Allocazione memoria
+    float *x = (float *)malloc(N * sizeof(float));
+    Complex *X = (Complex *)malloc(N * sizeof(Complex));
+    float *y = (float *)malloc(N * sizeof(float));
+
+    readWavFile(filename, x, N);
+
+    // Allocazione memoria device
+    float *d_x;
+    Complex *d_X;
+    float *d_y;
+    cudaMalloc((void **)&d_x, N * sizeof(float));
+    cudaMalloc((void **)&d_X, N * sizeof(Complex));
+    cudaMalloc((void **)&d_y, N * sizeof(float));
+
+    // Copia dati host -> device
+    cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Configurazione kernel
+    int blockSize = 256;
+    int gridSize = (N + blockSize - 1) / blockSize;
+
+    // Esecuzione DFT
+    dftKernel<<<gridSize, blockSize>>>(d_x, d_X, N);
+    cudaDeviceSynchronize();
+
+    // Applicazione filtro
+    filtroKernel<<<gridSize, blockSize>>>(d_X, N, 1000);
+    cudaDeviceSynchronize();
+
+    // Esecuzione IDFT
+    idftKernel<<<gridSize, blockSize>>>(d_X, d_y, N);
+    cudaDeviceSynchronize();
+
+    // Copia dati device -> host
+    cudaMemcpy(y, d_y, N * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Libera memoria
+    free(x);
+    free(X);
+    free(y);
+    cudaFree(d_x);
+    cudaFree(d_X);
+    cudaFree(d_y);
+
+    return 0;
+}
+
+*/
