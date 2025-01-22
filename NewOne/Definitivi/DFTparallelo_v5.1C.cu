@@ -197,12 +197,12 @@ __global__ void dftKernel(const float *x, Complesso *X, int N) {
                 imag = fmaf(-shared_x[j+7], sinAngle, imag);
             }
             
-            globalIdx = blockOffset + j+8+9;
+            globalIdx = blockOffset + j+8;
             if (globalIdx < N) {
                 angle = angleFactor * globalIdx;
                 __sincosf(angle, &sinAngle, &cosAngle);
-                real = fmaf(shared_x[j+8+9], cosAngle, real);
-                imag = fmaf(-shared_x[j+8+9], sinAngle, imag);
+                real = fmaf(shared_x[j+8], cosAngle, real);
+                imag = fmaf(-shared_x[j+8], sinAngle, imag);
             }
             
             globalIdx = blockOffset + j+9;
@@ -248,7 +248,7 @@ __global__ void idftKernel(const Complesso *X, float *x, int N) {
     float angle, cosAngle, sinAngle;
     float angleFactor = 2.0f * PI * i / N;
     float temp = 0.0f;
-// Complesso shared_X[blockDim.x];
+
     for (int blockOffset = 0; blockOffset < N; blockOffset += blockDim.x) {
         // Copia i dati nella memoria condivisa
         int idx = blockOffset + tid;
